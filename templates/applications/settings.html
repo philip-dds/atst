@@ -13,6 +13,9 @@
 
 {% block application_content %}
 
+  {% if show_flash -%}
+    {% include "fragments/flash.html" %}
+  {%- endif %}
   <h3>{{ 'portfolios.applications.settings.name_description' | translate }}</h3>
 
   {% if user_can(permissions.EDIT_APPLICATION) %}

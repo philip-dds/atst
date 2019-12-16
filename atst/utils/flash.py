@@ -29,6 +29,11 @@ MESSAGES = {
         """,
         "category": "success",
     },
+    "application_environments_name_error": {
+        "title_template": "",
+        "message_template": """{{ 'flash.application.env_name_error.message' | translate({ 'name': name }) }}""",
+        "category": "error",
+    },
     "application_environments_updated": {
         "title_template": "Application environments updated",
         "message_template": "Application environments have been updated",

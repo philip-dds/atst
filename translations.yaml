@@ -116,6 +116,8 @@ flash:
     deleted: 'You have successfully deleted the {application_name} application. To view the retained activity log, visit the portfolio administration page.'
     name_error:
       message: 'The application name {name} has already been used in this portfolio. Please enter a unique name.'
+    env_name_error:
+      message: 'The environment name {name} has already been used in this application. Please enter a unique name.'
   delete_member_success: 'You have successfully deleted {member_name} from the portfolio.'
   deleted_member: Portfolio member deleted
   environment_added: 'The environment "{env_name}" has been added to the application.'
@@ -199,7 +201,7 @@ forms:
             </ul>
           </p>
         </div>
-    defense_component: 
+    defense_component:
       label: "Select DoD component(s) funding your Portfolio:"
       choices:
         air_force: Air Force
@@ -211,7 +213,7 @@ forms:
       help_text: |
         <p>
           Select the DOD component(s) that will fund all Applications within this Portfolio.
-          In JEDI, multiple DoD organizations can fund the same Portfolio.<br/> 
+          In JEDI, multiple DoD organizations can fund the same Portfolio.<br/>
           Select all that apply.<br/>
         </p>
   attachment:

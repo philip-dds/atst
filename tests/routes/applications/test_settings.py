@@ -52,8 +52,6 @@ def test_updating_application_environments_success(client, user_session):
         _external=True,
         fragment="application-environments",
         _anchor="application-environments",
-        active_toggler=environment.id,
-        active_toggler_section="edit",
     )
     assert environment.name == "new name a"
 
@@ -76,6 +74,24 @@ def test_update_environment_failure(client, user_session):
 
     assert response.status_code == 400
     assert environment.name == "original name"
+
+
+def test_enforces_unique_env_name(client, user_session, session):
+    application = ApplicationFactory.create()
+    user = application.portfolio.owner
+    name = "New Environment"
+    environment = EnvironmentFactory.create(application=application, name=name)
+    form_data = {"name": name}
+    user_session(user)
+
+    session.begin_nested()
+    response = client.post(
+        url_for("applications.new_environment", application_id=application.id),
+        data=form_data,
+    )
+    session.rollback()
+
+    assert response.status_code == 400
 
 
 def test_application_settings(client, user_session):
