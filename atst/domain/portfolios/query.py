@@ -12,7 +12,7 @@ from atst.models.portfolio_state_machine import PortfolioStateMachine
 #from atst.models.application import Application
 
 
-class PortfolioStateMachineQuery(Query):
+class PortfolioStateMachinesQuery(Query):
     model = PortfolioStateMachine
 
 

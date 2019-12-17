@@ -41,31 +41,34 @@ class PortfolioStateMachine(
 
     # can use on_exit as the callback to serialize fetched/updated data as well as the current
     # state that workers should resume on
-    states = [
-        {"name": FSMState.UNSTARTED, "on_exit": FSMState.STARTING},
-        "started",
-        "completed"
-    ]
-    transitions = [
-        {
-            "trigger": "start",
-            "source": FSMState.UNSTARTED,
-            "dest": FSMState.STARTED,
-            "conditions": "can_start",
-        },
-        {
-            "trigger": "complete",
-            "source": FSMState.STARTED,
-            "dest": FSMState.COMPLETED,
-            "conditions": "can_complete",
-        },
-        {
-            "trigger": "reset",
-            "source": FSMState.COMPLETED,
-            "dest": FSMState.UNSTARTED,
-            "conditions": "can_restart",
-        },
-    ]
+    #states = [
+    #    {
+    #        "name": FSMState.UNSTARTED,
+    #        "on_exit": FSMState.STARTING
+    #    },
+    #    FSMState.STARTED,
+    #    FSMState.COMPLETED,
+    #]
+    #transitions = [
+    #    {
+    #        "trigger": "start",
+    #        "source": FSMState.UNSTARTED,
+    #        "dest": FSMState.STARTED,
+    #        "conditions": "can_start",
+    #    },
+    #    {
+    #        "trigger": "complete",
+    #        "source": FSMState.STARTED,
+    #        "dest": FSMState.COMPLETED,
+    #        "conditions": "can_complete",
+    #    },
+    #    {
+    #        "trigger": "reset",
+    #        "source": FSMState.COMPLETED,
+    #        "dest": FSMState.UNSTARTED,
+    #        "conditions": "can_restart",
+    #    },
+    #]
 
     #def __init__(self, source=None, csp=None):
     #    if source is not None:
