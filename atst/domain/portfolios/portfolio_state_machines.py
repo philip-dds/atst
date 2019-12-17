@@ -1,22 +1,27 @@
+from transitions import Machine
 from atst.database import db
 
-from .query import PortfoliosQuery
+from atst.models import FSMState
+
+
+from .query import PortfoliosQuery,PortfolioStateMachineQuery
+
 
 class PortfolioStateMachines(object):
     @classmethod
-    def create(cls, user, portfolio_attrs):
-        portfolio = PortfoliosQuery.create(**portfolio_attrs)
-        perms_sets = PermissionSets.get_many(PortfolioRoles.PORTFOLIO_PERMISSION_SETS)
-        Portfolios._create_portfolio_role(
-            user,
-            portfolio,
-            status=PortfolioRoleStatus.ACTIVE,
-            permission_sets=perms_sets,
+    def create(cls, portfolio, **sm_attrs):
+        sm_attrs.update({'portfolio': portfolio})
+        sm = PortfolioStateMachineQuery.create(**sm_attrs)
+        machine = sm.machine_instance = Machine(
+            model = sm,
+            states = sm.__class__.states,
+            initial = FSMState.UNSTARTED,
+            ordered_transitions= sm.__class__.transitions,
         )
-        PortfoliosQuery.add_and_commit(portfolio)
-        return portfolio
+        PortfolioStateMachineQuery.add_and_commit(sm)
+        return sm
 
     @classmethod
-    def get(cls, user, portfolio_id):
-        portfolio = PortfoliosQuery.get(portfolio_id)
-        return ScopedPortfolio(user, portfolio)
+    def get(cls, portfolio_id):
+        sm = PortfolioStateMachineQuery.get(portfolio_id)
+        return sm

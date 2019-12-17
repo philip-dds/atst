@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, JSON, text
+from enum import Enum
+from sqlalchemy import Column, String, Integer, ForeignKey, JSON, text, Enum as SQLAEnum
 from sqlalchemy.types import PickleType
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +9,15 @@ from atst.models.base import Base
 from atst.domain.csp import MockCSP, AzureCSP
 import atst.models.mixins as mixins
 from atst.database import db
+
+
+class FSMState(Enum):
+    UNSTARTED = "unstarted"
+    STARTING = "starting"
+    STARTED = "started"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
 
 class PortfolioStateMachine(
     Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin
@@ -25,30 +35,34 @@ class PortfolioStateMachine(
 
     machine_instance = Column(PickleType)
 
+    state = Column(
+        SQLAEnum(FSMState, native_enum=False), default=FSMState.UNSTARTED, nullable=True
+    )
+
     # can use on_exit as the callback to serialize fetched/updated data as well as the current
     # state that workers should resume on
     states = [
-        {"name": "unstarted", "on_exit": "starting"},
+        {"name": FSMState.UNSTARTED, "on_exit": FSMState.STARTING},
         "started",
         "completed"
     ]
     transitions = [
         {
             "trigger": "start",
-            "source": "unstarted",
-            "dest": "started",
+            "source": FSMState.UNSTARTED,
+            "dest": FSMState.STARTED,
             "conditions": "can_start",
         },
         {
             "trigger": "complete",
-            "source": "started",
-            "dest": "completed",
+            "source": FSMState.STARTED,
+            "dest": FSMState.COMPLETED,
             "conditions": "can_complete",
         },
         {
             "trigger": "reset",
-            "source": "completed",
-            "dest": "unstarted",
+            "source": FSMState.COMPLETED,
+            "dest": FSMState.UNSTARTED,
             "conditions": "can_restart",
         },
     ]

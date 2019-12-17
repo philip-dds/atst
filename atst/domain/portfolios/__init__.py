@@ -3,3 +3,6 @@ from .portfolios import (
     PortfolioError,
     PortfolioDeletionApplicationsExistError,
 )
+from .portfolio_state_machines import (
+    PortfolioStateMachines,
+)
