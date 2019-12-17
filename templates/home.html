@@ -13,12 +13,6 @@
      {% set sticky_header = "home.get_started" | translate  %}
   {% endif %}
 
-  {% call StickyCTA(sticky_header) %}
-      <a href="{{ url_for("portfolios.new_portfolio_step_1") }}" class="usa-button-primary">
-        {{ "home.add_portfolio_button_text" | translate }}
-      </a>
-  {% endcall %}
-
   <div class="about-cloud">
     {% include "fragments/flash.html" %}
 
@@ -92,9 +86,10 @@
           </div>
         </div>
       </toggler>
-
     </div>
-    <img id='jedi-heirarchy' src="{{ url_for("static", filename="img/JEDIhierarchyDiagram.png")}}" alt="JEDI heirarchy diagram">
+    <a href="{{ url_for("portfolios.new_portfolio_step_1") }}" class="usa-button-primary">
+      {{ "home.add_portfolio_button_text" | translate }}
+    </a>
   </div>
 </main>
 

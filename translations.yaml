@@ -526,7 +526,8 @@ task_orders:
       description: Finally, plase confirm that your uploaded document representing the information you've entered contains the required signature from your Contracting Officer. You will be informed as soon as CCPO completes their review.
       alert_message: All task orders require a Contracting Officer signature.
       next_button: 'Confirm & Submit'
-    sticky_header_text: 'Add Task Order (step {step} of 5)'
+    sticky_header_text: 'Add Task Order'
+    sticky_header_context: 'Step {step} of 5'
   empty_state:
     header: Add approved task orders
     message: Upload your approved Task Order here. You are required to confirm you have the appropriate signature. You will have the ability to add additional approved Task Orders with more funding to this Portfolio in the future.
