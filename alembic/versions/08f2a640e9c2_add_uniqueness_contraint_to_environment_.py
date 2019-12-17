@@ -6,8 +6,6 @@ Create Date: 2019-12-16 10:43:12.331095
 
 """
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '08f2a640e9c2' # pragma: allowlist secret
