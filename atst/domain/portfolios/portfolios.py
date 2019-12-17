@@ -1,9 +1,13 @@
+from typing import List
+from uuid import UUID
+
 from atst.database import db
 from atst.domain.permission_sets import PermissionSets
 from atst.domain.authz import Authorization
 from atst.domain.portfolio_roles import PortfolioRoles
 from atst.domain.invitations import PortfolioInvitations
 from atst.models import Permissions, PortfolioRole, PortfolioRoleStatus
+
 
 from .query import PortfoliosQuery
 from .scopes import ScopedPortfolio
@@ -108,3 +112,20 @@ class Portfolios(object):
             portfolio.name = new_data["name"]
 
         PortfoliosQuery.add_and_commit(portfolio)
+
+
+    @classmethod
+    def base_provision_query(cls):
+        return (
+            db.session.query(Portfolio.id)
+        )
+
+    @classmethod
+    def get_portfolios_pending_provisioning(cls) -> List[UUID]:
+        """
+        Any portfolio with a corresponding State Machine that has not completed.
+        """
+        results = (
+            cls.base_provision_query().filter().all()
+        )
+        return [id_ for id_, in results]

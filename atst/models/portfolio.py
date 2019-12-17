@@ -32,13 +32,20 @@ class Portfolio(
     native_apps = Column(String)  # Native Apps
     team_experience = Column(String)  # Team Experience
 
-    csp_data = Column(JSON, BasePortfolioCSPDetails)
+    #csp_data = Column(JSON, BasePortfolioCSPDetails)
 
     applications = relationship(
         "Application",
         back_populates="portfolio",
         primaryjoin="and_(Application.portfolio_id == Portfolio.id, Application.deleted == False)",
     )
+
+    state_machine = relationship(
+        "PortfolioStateMachine",
+        uselist=False,
+        back_populates="portfolio",
+    )
+
     roles = relationship("PortfolioRole")
 
     task_orders = relationship("TaskOrder")

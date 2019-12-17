@@ -15,6 +15,15 @@ from atst.models.utils import claim_for_update
 from atst.utils.localization import translate
 
 
+class RecordPortfolioFailure(celery.Task):
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        if "portfolio_id" in kwargs:
+            failure = PortfolioJobFailure(
+                portfolio_id=kwargs["portfolio_id"], task_id=task_id
+            )
+            db.session.add(failure)
+            db.session.commit()
+
 class RecordEnvironmentFailure(celery.Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         if "environment_id" in kwargs:
@@ -125,6 +134,11 @@ def do_work(fn, task, csp, **kwargs):
         raise task.retry(exc=e)
 
 
+
+@celery.task(bind=True, base=RecordPortfolioFailure)
+def provision_portfolio(self, portfolio_id=None):
+    do_work(do_provision_portfolio, self, app.csp.cloud, portfolio_id=portfolio_id)
+
 @celery.task(bind=True, base=RecordEnvironmentFailure)
 def create_environment(self, environment_id=None):
     do_work(do_create_environment, self, app.csp.cloud, environment_id=environment_id)
@@ -142,6 +156,12 @@ def provision_user(self, environment_role_id=None):
     do_work(
         do_provision_user, self, app.csp.cloud, environment_role_id=environment_role_id
     )
+
+
+@celery.task(bind=True)
+def dispatch_provision_portfolio(self):
+    for portfolio_id in Portfolios.get_portfolios_pending_provisioning():
+        provision_portfolio.delay(portfolio_id=portfolio_id)
 
 
 @celery.task(bind=True)
