@@ -1,8 +1,8 @@
 """portfolio state machine table. 
 
-Revision ID: 825bbe147885
+Revision ID: 54e22bdf14b3
 Revises: 67a2151d6269
-Create Date: 2019-12-17 09:39:34.588597
+Create Date: 2019-12-17 11:41:19.864351
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '825bbe147885' # pragma: allowlist secret
+revision = '54e22bdf14b3' # pragma: allowlist secret
 down_revision = '67a2151d6269' # pragma: allowlist secret
 branch_labels = None
 depends_on = None
@@ -23,10 +23,10 @@ def upgrade():
     sa.Column('time_updated', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('deleted', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
-    sa.Column('portfolio_id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('portfolio_id', postgresql.UUID(as_uuid=True), nullable=True),
     sa.Column('machine_instance', sa.PickleType(), nullable=True),
     sa.ForeignKeyConstraint(['portfolio_id'], ['portfolios.id'], ),
-    sa.PrimaryKeyConstraint('id', 'portfolio_id')
+    sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
 

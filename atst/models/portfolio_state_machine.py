@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from atst.models.types import Id
 from atst.models.base import Base
+from atst.domain.csp import MockCSP, AzureCSP
 import atst.models.mixins as mixins
 from atst.database import db
 
@@ -18,8 +19,7 @@ class PortfolioStateMachine(
     portfolio_id = Column(
         UUID(as_uuid=True),
         ForeignKey("portfolios.id"),
-        primary_key=True,
-        server_default=text("uuid_generate_v4()"),
+        #server_default=text("uuid_generate_v4()"),
     )
     portfolio = relationship("Portfolio", back_populates="state_machine")
 
@@ -53,14 +53,14 @@ class PortfolioStateMachine(
         },
     ]
 
-    def __init__(self, source=None, csp=None):
-        if source is not None:
-            pass  # hydrate from source
+    #def __init__(self, source=None, csp=None):
+    #    if source is not None:
+    #        pass  # hydrate from source
 
-        if csp is not None:
-            self.csp = AzureCSP().cloud
-        else:
-            self.csp = MockCSP().cloud
+        #if csp is not None:
+        #    self.csp = AzureCSP().cloud
+        #else:
+        #    self.csp = MockCSP().cloud
 
         #self.machine = transitions.Machine(
         #    model=self,
@@ -69,33 +69,35 @@ class PortfolioStateMachine(
         #    ordered_transitions=PortfolioFSM.transitions,
         #)
 
-    def next_state():
-        self.csp.cloud.create_tenant()
+    @property
+    def application_id(self):
+        return None
+
+    #def next_state():
+    #    pass
+        #self.csp.cloud.create_tenant()
 
     def can_start(self):
-        import ipdb
-
-        ipdb.set_trace()
-        self.force_complete()
+        #import ipdb
+        #ipdb.set_trace()
+        #self.force_complete()
         return True
 
     def can_restart(self):
         return True
 
     def can_complete(self):
-        import ipdb
-
-        ipdb.set_trace()
+        #import ipdb
+        #ipdb.set_trace()
         return False
 
     def can_force_complete(self):
-        import ipdb
-
-        ipdb.set_trace()
+        #import ipdb
+        #ipdb.set_trace()
         return True
 
     def starting(self):
-        self.current_state = self.state
-        import ipdb
-
-        ipdb.set_trace()
+        #self.current_state = self.state
+        #import ipdb
+        #ipdb.set_trace()
+        return True
