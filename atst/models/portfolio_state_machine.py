@@ -1,8 +1,9 @@
 from enum import Enum
 from sqlalchemy import Column, String, Integer, ForeignKey, JSON, text, Enum as SQLAEnum
-from sqlalchemy.types import PickleType
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
+
+from transitions import Machine
 
 from atst.models.types import Id
 from atst.models.base import Base
@@ -20,7 +21,7 @@ class FSMStates(Enum):
 
 
 class PortfolioStateMachine(
-    Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin
+    Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin, Machine
 ):
     __tablename__ = "portfolio_state_machines"
 
@@ -29,11 +30,8 @@ class PortfolioStateMachine(
     portfolio_id = Column(
         UUID(as_uuid=True),
         ForeignKey("portfolios.id"),
-        #server_default=text("uuid_generate_v4()"),
     )
     portfolio = relationship("Portfolio", back_populates="state_machine")
-
-    machine_instance = Column(PickleType)
 
     state = Column(
         SQLAEnum(FSMStates, native_enum=False), default=FSMStates.UNSTARTED, nullable=True
@@ -49,35 +47,43 @@ class PortfolioStateMachine(
     #    FSMStates.STARTED,
     #    FSMStates.COMPLETED,
     #]
-    #transitions = [
-    #    {
-    #        "trigger": "start",
-    #        "source": FSMStates.UNSTARTED,
-    #        "dest": FSMStates.STARTED,
-    #        "conditions": "can_start",
-    #    },
-    #    {
-    #        "trigger": "complete",
-    #        "source": FSMStates.STARTED,
-    #        "dest": FSMStates.COMPLETED,
-    #        "conditions": "can_complete",
-    #    },
-    #    {
-    #        "trigger": "reset",
-    #        "source": FSMStates.COMPLETED,
-    #        "dest": FSMStates.UNSTARTED,
-    #        "conditions": "can_restart",
-    #    },
-    #]
+    transitions = [
+        {
+            "trigger": "start",
+            "source": FSMStates.UNSTARTED,
+            "dest": FSMStates.STARTED,
+            "conditions": "can_start",
+        },
+        {
+            "trigger": "complete",
+            "source": FSMStates.STARTED,
+            "dest": FSMStates.COMPLETED,
+            "conditions": "can_complete",
+        },
+        {
+            "trigger": "reset",
+            "source": FSMStates.COMPLETED,
+            "dest": FSMStates.UNSTARTED,
+            "conditions": "can_restart",
+        },
+    ]
 
-    #def __init__(self, source=None, csp=None):
-    #    if source is not None:
-    #        pass  # hydrate from source
+    def __init__(self, portfolio, **kwargs):
+            #source=None, csp=None):
+        #if source is not None:
+        #    pass  # hydrate from source
 
         #if csp is not None:
         #    self.csp = AzureCSP().cloud
         #else:
         #    self.csp = MockCSP().cloud
+
+        self.portfolio = portfolio
+        Machine.__init__(self,
+                states=FSMStates,
+                transitions=PortfolioStateMachine.transitions,
+                initial=self.state.value if self.state else FSMStates.UNSTARTED,
+        )
 
         #self.machine = transitions.Machine(
         #    model=self,
