@@ -5,6 +5,8 @@ from atst.database import db
 from atst.domain.permission_sets import PermissionSets
 from atst.domain.authz import Authorization
 from atst.domain.portfolio_roles import PortfolioRoles
+from atst.domain.portfolios.portfolio_state_machines import PortfolioStateMachines
+
 from atst.domain.invitations import PortfolioInvitations
 from atst.models import Permissions, PortfolioRole, PortfolioRoleStatus
 
@@ -22,6 +24,20 @@ class PortfolioDeletionApplicationsExistError(Exception):
 
 
 class Portfolios(object):
+
+    @classmethod
+    def provision_to_csp(cls, portfolio_id):
+        """
+        create Portfolio State Machine
+        """
+        portfolio = PortfoliosQuery.get(portfolio_id)
+        if not portfolio.state_machine:
+            sm = PortfolioStateMachines.create(portfolio)
+            print("kicked off provisioning for portfolio <%s> state <%s>" % (
+                portfolio.id, sm.state))
+        else:
+            print("portfolio <%s>" % portfolio.id)
+
     @classmethod
     def create(cls, user, portfolio_attrs):
         portfolio = PortfoliosQuery.create(**portfolio_attrs)
