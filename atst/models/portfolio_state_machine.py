@@ -5,6 +5,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from transitions import Machine
 
+from flask import current_app as app
+
 from atst.models.types import Id
 from atst.models.base import Base
 from atst.domain.csp import MockCSP, AzureCSP
@@ -68,15 +70,14 @@ class PortfolioStateMachine(
         },
     ]
 
-    def __init__(self, portfolio, **kwargs):
-            #source=None, csp=None):
-        #if source is not None:
-        #    pass  # hydrate from source
+    def __init__(self, portfolio, source=None, csp=None, **kwargs):
+        if source is not None:
+            pass  # hydrate from source
 
-        #if csp is not None:
-        #    self.csp = AzureCSP().cloud
-        #else:
-        #    self.csp = MockCSP().cloud
+        if csp is not None:
+            self.csp = AzureCSP().cloud
+        else:
+            self.csp = MockCSP(app).cloud
 
         self.portfolio = portfolio
         Machine.__init__(self,
@@ -84,13 +85,6 @@ class PortfolioStateMachine(
                 transitions=PortfolioStateMachine.transitions,
                 initial=self.state.value if self.state else FSMStates.UNSTARTED,
         )
-
-        #self.machine = transitions.Machine(
-        #    model=self,
-        #    initial=self.current_state,
-        #    states=PortfolioFSM.states,
-        #    ordered_transitions=PortfolioFSM.transitions,
-        #)
 
     @property
     def application_id(self):
