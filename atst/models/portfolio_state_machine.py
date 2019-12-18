@@ -11,7 +11,7 @@ import atst.models.mixins as mixins
 from atst.database import db
 
 
-class FSMState(Enum):
+class FSMStates(Enum):
     UNSTARTED = "unstarted"
     STARTING = "starting"
     STARTED = "started"
@@ -36,36 +36,36 @@ class PortfolioStateMachine(
     machine_instance = Column(PickleType)
 
     state = Column(
-        SQLAEnum(FSMState, native_enum=False), default=FSMState.UNSTARTED, nullable=True
+        SQLAEnum(FSMStates, native_enum=False), default=FSMStates.UNSTARTED, nullable=True
     )
 
     # can use on_exit as the callback to serialize fetched/updated data as well as the current
     # state that workers should resume on
     #states = [
     #    {
-    #        "name": FSMState.UNSTARTED,
-    #        "on_exit": FSMState.STARTING
+    #        "name": FSMStates.UNSTARTED,
+    #        "on_exit": FSMStates.STARTING
     #    },
-    #    FSMState.STARTED,
-    #    FSMState.COMPLETED,
+    #    FSMStates.STARTED,
+    #    FSMStates.COMPLETED,
     #]
     #transitions = [
     #    {
     #        "trigger": "start",
-    #        "source": FSMState.UNSTARTED,
-    #        "dest": FSMState.STARTED,
+    #        "source": FSMStates.UNSTARTED,
+    #        "dest": FSMStates.STARTED,
     #        "conditions": "can_start",
     #    },
     #    {
     #        "trigger": "complete",
-    #        "source": FSMState.STARTED,
-    #        "dest": FSMState.COMPLETED,
+    #        "source": FSMStates.STARTED,
+    #        "dest": FSMStates.COMPLETED,
     #        "conditions": "can_complete",
     #    },
     #    {
     #        "trigger": "reset",
-    #        "source": FSMState.COMPLETED,
-    #        "dest": FSMState.UNSTARTED,
+    #        "source": FSMStates.COMPLETED,
+    #        "dest": FSMStates.UNSTARTED,
     #        "conditions": "can_restart",
     #    },
     #]
