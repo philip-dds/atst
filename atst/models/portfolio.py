@@ -33,7 +33,7 @@ class Portfolio(
     native_apps = Column(String)  # Native Apps
     team_experience = Column(String)  # Team Experience
 
-    #csp_data = Column(JSON, BasePortfolioCSPDetails)
+    csp_data = Column(JSON, nullable=True)
 
     applications = relationship(
         "Application",
