@@ -8,7 +8,7 @@ from atst.domain.portfolio_roles import PortfolioRoles
 from atst.domain.portfolios.portfolio_state_machines import PortfolioStateMachines
 
 from atst.domain.invitations import PortfolioInvitations
-from atst.models import Permissions, PortfolioRole, PortfolioRoleStatus
+from atst.models import Portfolio, PortfolioStateMachine, FSMStates, Permissions, PortfolioRole, PortfolioRoleStatus
 
 
 from .query import PortfoliosQuery
@@ -26,17 +26,16 @@ class PortfolioDeletionApplicationsExistError(Exception):
 class Portfolios(object):
 
     @classmethod
-    def provision_to_csp(cls, portfolio_id):
+    def provision_to_csp(cls, portfolio):
         """
         create Portfolio State Machine
         """
-        portfolio = PortfoliosQuery.get(portfolio_id)
         if not portfolio.state_machine:
-            sm = PortfolioStateMachines.create(portfolio)
+            fsm = PortfolioStateMachines.create(portfolio)
             print("kicked off provisioning for portfolio <%s> state <%s>" % (
-                portfolio.id, sm.state))
-        else:
-            print("portfolio <%s>" % portfolio.id)
+                portfolio.id, fsm.state))
+            return fsm
+        return portfolio.state_machine
 
     @classmethod
     def create(cls, user, portfolio_attrs):
@@ -142,6 +141,16 @@ class Portfolios(object):
         Any portfolio with a corresponding State Machine that has not completed.
         """
         results = (
-            cls.base_provision_query().filter().all()
+            cls.base_provision_query().\
+                join(PortfolioStateMachine).\
+                filter(PortfolioStateMachine.state != FSMStates.COMPLETED)
         )
         return [id_ for id_, in results]
+
+        #db.session.query(PortfolioStateMachine).\
+        #        filter(
+        #            or_(
+        #                PortfolioStateMachine.state==FSMStates.UNSTARTED,
+        #                PortfolioStateMachine.state==FSMStates.UNSTARTED,
+        #            )
+        #        ).all()

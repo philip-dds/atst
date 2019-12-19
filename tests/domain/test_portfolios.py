@@ -14,6 +14,7 @@ from atst.domain.environments import Environments
 from atst.domain.permission_sets import PermissionSets, PORTFOLIO_PERMISSION_SETS
 from atst.models.application_role import Status as ApplicationRoleStatus
 from atst.models.portfolio_role import Status as PortfolioRoleStatus
+from atst.models import FSMStates
 
 from tests.factories import (
     ApplicationFactory,
@@ -21,6 +22,7 @@ from tests.factories import (
     UserFactory,
     PortfolioRoleFactory,
     PortfolioFactory,
+    PortfolioStateMachineFactory,
     get_all_portfolio_permission_sets,
 )
 
@@ -253,3 +255,17 @@ def test_for_user_does_not_include_deleted_application_roles():
         status=ApplicationRoleStatus.ACTIVE, user=user2, application=app, deleted=True
     )
     assert len(Portfolios.for_user(user2)) == 0
+
+def test_provision_to_csp(portfolio):
+    fsm = Portfolios.provision_to_csp(portfolio)
+    assert fsm
+
+def test_get_portfolios_pending_provisioning(session):
+    for x in range(5):
+        portfolio = PortfolioFactory.create()
+        sm = PortfolioStateMachineFactory.create(portfolio=portfolio)
+        if x == 2: sm.state = FSMStates.COMPLETED
+    assert len(Portfolios.get_portfolios_pending_provisioning()) == 4
+
+
+
