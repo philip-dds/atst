@@ -502,6 +502,146 @@ class AzureCloudProvider(CloudProviderInterface):
             "role_name": role_assignment_id,
         }
 
+    def create_tenant(
+        self,
+        creds,
+        user_id,
+        password,
+        domain_name,
+        first_name,
+        last_name,
+        country_code,
+        password_recovery_email_address,
+    ):
+        # auth as SP that is allowed to create tenant? (tenant creation sp creds)
+        # create tenant with owner details (populated from portfolio point of contact, pw is generated)
+
+        # return tenant id, tenant owner id and tenant owner object id from:
+        response = {"tenantId": "string", "userId": "string", "objectId": "string"}
+        return self._ok(
+            {
+                "tenant_id": response["tenantId"],
+                "user_id": response["userId"],
+                "user_object_id": response["objectId"],
+            }
+        )
+
+    def create_billing_owner(self, creds, tenant_admin_details):
+        # authenticate as tenant_admin
+        # create billing owner identity
+
+        # TODO: Lookup response format
+        # Managed service identity?
+        response = {"id": "string"}
+        return self._ok({"billing_owner_id": response["id"]})
+
+    def assign_billing_owner(self, creds, billing_owner_id, tenant_id):
+        # TODO: Do we source role definition ID from config, api or self-defined?
+        # TODO: If from api,
+        """
+        {
+            "principalId": "string",
+            "principalTenantId": "string",
+            "billingRoleDefinitionId": "string"
+        }
+        """
+
+        return self.ok()
+
+    def create_billing_profile(self, creds, tenant_admin_details, billing_owner_id):
+        # call billing profile creation endpoint, specifying owner
+        # Payload:
+        """
+        {
+            "displayName": "string",
+            "poNumber": "string",
+            "address": {
+                "firstName": "string",
+                "lastName": "string",
+                "companyName": "string",
+                "addressLine1": "string",
+                "addressLine2": "string",
+                "addressLine3": "string",
+                "city": "string",
+                "region": "string",
+                "country": "string",
+                "postalCode": "string"
+            },
+            "invoiceEmailOptIn": true,
+            Note: These last 2 are also the body for adding/updating new TOs/clins
+            "enabledAzurePlans": [
+                {
+                "skuId": "string"
+                }
+            ],
+            "clinBudget": {
+                "amount": 0,
+                "startDate": "2019-12-18T16:47:40.909Z",
+                "endDate": "2019-12-18T16:47:40.909Z",
+                "externalReferenceId": "string"
+            }
+        }
+        """
+
+        # response will be mostly the same as the body, but we only really care about the id
+        response = {"id": "string"}
+        return self._ok({"billing_profile_id": response["id"]})
+
+    def report_clin(self, creds, clin_id, clin_amount, clin_start, clin_end, clin_to):
+        # should consumer be responsible for reporting each clin or
+        # should this take a list and manage the sequential reporting?
+        """ Payload
+        {
+            "enabledAzurePlans": [
+                {
+                "skuId": "string"
+                }
+            ],
+            "clinBudget": {
+                "amount": 0,
+                "startDate": "2019-12-18T16:47:40.909Z",
+                "endDate": "2019-12-18T16:47:40.909Z",
+                "externalReferenceId": "string"
+            }
+        }
+        """
+
+        # we don't need any of the returned info for this
+        return self._ok()
+
+    def create_remote_admin(self, creds, tenant_details):
+        # create app/service principal within tenant, with name constructed from tenant details
+        # assign principal global admin
+
+        # needs to call out to CLI with tenant owner username/password, prototyping for that underway
+
+        # return identifier and creds to consumer for storage
+        response = {"clientId": "string", "secretKey": "string", "tenantId": "string"}
+        return self._ok(
+            {
+                "client_id": response["clientId"],
+                "secret_key": response["secret_key"],
+                "tenant_id": response["tenantId"],
+            }
+        )
+
+    def force_tenant_admin_pw_update(self, creds, tenant_owner_id):
+        # use creds to update to force password recovery?
+        # not sure what the endpoint/method for this is, yet
+
+        return self._ok()
+
+    def create_billing_alerts(self, TBD):
+        # TODO: Add azure-mgmt-consumption for Budget and Notification entities/operations
+        # TODO: Determine how to auth against that API using the SDK, doesn't seeem possible at the moment
+        # TODO: billing alerts are registered as Notifications on Budget objects, which have start/end dates
+        # TODO: determine what the keys in the Notifications dict are supposed to be
+        # we may need to rotate budget objects when new TOs/CLINs are reported?
+
+        # we likely only want the budget ID, can be updated or replaced?
+        response = {"id": "id"}
+        return self._ok({"budget_id": response["id"]})
+
     def _get_management_service_principal(self):
         # we really should be using graph.microsoft.com, but i'm getting
         # "expired token" errors for that
@@ -554,6 +694,7 @@ class AzureCloudProvider(CloudProviderInterface):
             return sub_id_match.group(1)
 
     def _get_credential_obj(self, creds, resource=None):
+
         return self.sdk.credentials.ServicePrincipalCredentials(
             client_id=creds.get("client_id"),
             secret=creds.get("secret_key"),
@@ -562,6 +703,27 @@ class AzureCloudProvider(CloudProviderInterface):
             cloud_environment=self.sdk.cloud,
         )
 
+    def _make_tenant_admin_cred_obj(self, username, password):
+        return self.sdk.credentials.UserPassCredentials(username, password)
+
+    def _ok(self, body=None):
+        return self._make_response("ok", body)
+
+    def _error(self, body=None):
+        return self._make_response("error", body)
+
+    def _make_response(self, status, body=dict()):
+        """Create body for responses from API
+
+        Arguments:
+            status {string} -- "ok" or "error"
+            body {dict} -- dict containing details of response or error, if applicable
+
+        Returns:
+            dict -- status of call with body containing details
+        """
+        return {"status": status, "body": body}
+
     @property
     def _root_creds(self):
         return {
@@ -569,4 +731,3 @@ class AzureCloudProvider(CloudProviderInterface):
             "secret_key": self.secret_key,
             "tenant_id": self.tenant_id,
         }
-
