@@ -323,6 +323,19 @@ class MockCloudProvider(CloudProviderInterface):
 
         return {"id": self._id(), "credentials": self._auth_credentials}
 
+
+    def create_tenant( self, creds, user_id, password, domain_name, first_name, last_name, country_code, password_recovery_email_address,):
+        # return tenant id, tenant owner id and tenant owner object id from:
+        response = {"tenantId": "string", "userId": "string", "objectId": "string"}
+        return self._ok(
+            {
+                "tenant_id": response["tenantId"],
+                "user_id": response["userId"],
+                "user_object_id": response["objectId"],
+            }
+        )
+
+
     def create_or_update_user(self, auth_credentials, user_info, csp_role_id):
         self._authorize(auth_credentials)
 

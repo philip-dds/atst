@@ -5,9 +5,12 @@ from unittest.mock import Mock
 from threading import Thread
 
 from atst.domain.csp.cloud import MockCloudProvider
+from atst.domain.portfolios import Portfolios
+
 from atst.jobs import (
     RecordEnvironmentFailure,
     RecordEnvironmentRoleFailure,
+    do_provision_portfolio,
     do_create_environment,
     do_create_atat_admin_user,
     dispatch_create_environment,
@@ -30,6 +33,11 @@ from atst.models import EnvironmentRole, ApplicationRoleStatus
 @pytest.fixture(autouse=True, scope="function")
 def csp():
     return Mock(wraps=MockCloudProvider({}, with_delay=False, with_failure=False))
+
+@pytest.fixture(scope="function")
+def portfolio():
+    portfolio = PortfolioFactory.create()
+    return portfolio
 
 
 def test_environment_job_failure(celery_app, celery_worker):
@@ -306,3 +314,18 @@ def test_do_provision_user(csp, session):
     )
     # I expect that the EnvironmentRole now has a csp_user_id
     assert environment_role.csp_user_id
+
+def test_do_provision_portfolio(csp, session, portfolio):
+
+    fsm = Portfolios.provision_to_csp(portfolio)
+    #sm = PortfolioStateMachineFactory.create(portfolio=portfolio)
+    print(fsm.state)
+    do_provision_portfolio(csp=csp, portfolio_id=portfolio.id)
+
+    #session.refresh(environment_role)
+    # I expect that the CSP create_or_update_user method will be called
+    #csp.create_or_update_user.assert_called_once_with(
+    #    credentials, environment_role, "my_role"
+    #)
+    # I expect that the EnvironmentRole now has a csp_user_id
+    #assert environment_role.csp_user_id

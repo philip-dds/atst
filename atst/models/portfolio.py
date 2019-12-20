@@ -41,7 +41,8 @@ class Portfolio(
         primaryjoin="and_(Application.portfolio_id == Portfolio.id, Application.deleted == False)",
     )
 
-    state_machine = relationship("PortfolioStateMachine", uselist=False, back_populates="portfolio")
+    state_machine = relationship("PortfolioStateMachine",
+            uselist=False, back_populates="portfolio")
 
     roles = relationship("PortfolioRole")
 

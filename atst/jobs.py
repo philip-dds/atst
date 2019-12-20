@@ -7,9 +7,12 @@ from atst.models import (
     EnvironmentJobFailure,
     EnvironmentRoleJobFailure,
     EnvironmentRole,
+    Portfolio,
+    PortfolioJobFailure,
 )
 from atst.domain.csp.cloud import CloudProviderInterface, GeneralCSPException
 from atst.domain.environments import Environments
+from atst.domain.portfolios import Portfolios
 from atst.domain.environment_roles import EnvironmentRoles
 from atst.models.utils import claim_for_update
 from atst.utils.localization import translate
@@ -57,6 +60,18 @@ def send_notification_mail(recipients, subject, body):
         )
     )
     app.mailer.send(recipients, subject, body)
+
+
+def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
+    print("running provision for portfolio <%s>" % (portfolio_id))
+    #portfolios = db.session.query(Portfolio).\
+    #        filter_by(portfolio_id=portfolio_id, deleted=False).all()
+    portfolio = Portfolios.get_for_update(portfolio_id)
+    if  portfolio.state_machine is None:
+        fsm = Portfolios.provision_to_csp(portfolio)
+    else:
+        fsm = portfolio.state_machine
+    print("running provision for portfolio <%s> state: %s" % (portfolio.name, fsm.state))
 
 
 def do_create_environment(csp: CloudProviderInterface, environment_id=None):
