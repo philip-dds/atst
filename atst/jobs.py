@@ -157,29 +157,16 @@ def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
     print("running Provision Portfolio handler <%s> state: %s" % (portfolio.name, fsm.state))
 
     if fsm.state == FSMStates.UNSTARTED:
-        print('running init state')
         fsm.init()
-        db.session.add(fsm)
-        db.session.commit()
 
     if fsm.state == FSMStates.STARTING:
-        print('running init state')
         fsm.start()
-        db.session.add(fsm)
-        db.session.commit()
 
     if fsm.state == FSMStates.STARTED:
-        print('creating tenant....')
-        response = fsm.create_tenant(csp=csp.cloud)
-        print(response)
-        db.session.add(fsm)
-        db.session.commit()
+        fsm.create_tenant(csp=csp.cloud)
 
     if fsm.state == FSMStates.TENANT_CREATION_IN_PROGRESS:
         fsm.finish_create_tenant()
-        db.session.add(fsm)
-        db.session.commit()
-
 
 @celery.task(bind=True, base=RecordPortfolioFailure)
 def provision_portfolio(self, portfolio_id=None):

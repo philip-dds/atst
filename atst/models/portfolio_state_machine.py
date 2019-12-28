@@ -76,8 +76,6 @@ class AzureFSMMixin():
             # failed all attempts
             self.machine.fail_create_tenant()
 
-        print(response)
-        #{'tenant_id': 'string', 'user_id': 'string', 'user_object_id': 'string'}
         if self.portfolio.csp_data is None:
            self.portfolio.csp_data = {}
         self.portfolio.csp_data["tenant_data"] = response
@@ -87,7 +85,6 @@ class AzureFSMMixin():
     def is_tenant_created(self, event):
         # check portfolio csp details json field for fields
 
-        print("is_tenant_created: ", self.portfolio.csp_data)
         if self.portfolio.csp_data is None or \
                 not isinstance(self.portfolio.csp_data, dict):
             return False
@@ -119,7 +116,6 @@ class PortfolioStateMachine(
     )
 
     def __init__(self, portfolio, csp=None, **kwargs):
-        print('PortfolioStateMachine.__init__')
         self.portfolio = portfolio
         self.init_machine()
 
