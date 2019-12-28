@@ -256,8 +256,8 @@ def test_for_user_does_not_include_deleted_application_roles():
     )
     assert len(Portfolios.for_user(user2)) == 0
 
-def test_provision_to_csp(portfolio):
-    fsm = Portfolios.provision_to_csp(portfolio)
+def test_create_state_machine(portfolio):
+    fsm = Portfolios.create_state_machine(portfolio)
     assert fsm
 
 def test_get_portfolios_pending_provisioning(session):

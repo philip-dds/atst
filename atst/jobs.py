@@ -9,10 +9,13 @@ from atst.models import (
     EnvironmentRole,
     Portfolio,
     PortfolioJobFailure,
+    FSMStates,
 )
 from atst.domain.csp.cloud import CloudProviderInterface, GeneralCSPException
 from atst.domain.environments import Environments
 from atst.domain.portfolios import Portfolios
+from atst.domain.portfolios.query import PortfolioStateMachinesQuery
+
 from atst.domain.environment_roles import EnvironmentRoles
 from atst.models.utils import claim_for_update
 from atst.utils.localization import translate
@@ -61,17 +64,6 @@ def send_notification_mail(recipients, subject, body):
     )
     app.mailer.send(recipients, subject, body)
 
-
-def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
-    print("running provision for portfolio <%s>" % (portfolio_id))
-    #portfolios = db.session.query(Portfolio).\
-    #        filter_by(portfolio_id=portfolio_id, deleted=False).all()
-    portfolio = Portfolios.get_for_update(portfolio_id)
-    if  portfolio.state_machine is None:
-        fsm = Portfolios.provision_to_csp(portfolio)
-    else:
-        fsm = portfolio.state_machine
-    print("running provision for portfolio <%s> state: %s" % (portfolio.name, fsm.state))
 
 
 def do_create_environment(csp: CloudProviderInterface, environment_id=None):
@@ -149,6 +141,45 @@ def do_work(fn, task, csp, **kwargs):
         raise task.retry(exc=e)
 
 
+def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
+    print("running provision for portfolio <%s>" % (portfolio_id))
+    #portfolios = db.session.query(Portfolio).\
+    #        filter_by(portfolio_id=portfolio_id, deleted=False).all()
+    portfolio = Portfolios.get_for_update(portfolio_id)
+    if  portfolio.state_machine is None:
+        fsm = Portfolios.create_state_machine(portfolio)
+        db.session.add(fsm)
+        db.session.commit()
+    else:
+        fsm = PortfolioStateMachinesQuery.get(portfolio.state_machine.id)
+        print(fsm.events)
+
+    print("running Provision Portfolio handler <%s> state: %s" % (portfolio.name, fsm.state))
+
+    if fsm.state == FSMStates.UNSTARTED:
+        print('running init state')
+        fsm.init()
+        db.session.add(fsm)
+        db.session.commit()
+
+    if fsm.state == FSMStates.STARTING:
+        print('running init state')
+        fsm.start()
+        db.session.add(fsm)
+        db.session.commit()
+
+    if fsm.state == FSMStates.STARTED:
+        print('creating tenant....')
+        response = fsm.create_tenant(csp=csp.cloud)
+        print(response)
+        db.session.add(fsm)
+        db.session.commit()
+
+    if fsm.state == FSMStates.TENANT_CREATION_IN_PROGRESS:
+        fsm.finish_create_tenant()
+        db.session.add(fsm)
+        db.session.commit()
+
 
 @celery.task(bind=True, base=RecordPortfolioFailure)
 def provision_portfolio(self, portfolio_id=None):
@@ -175,6 +206,9 @@ def provision_user(self, environment_role_id=None):
 
 @celery.task(bind=True)
 def dispatch_provision_portfolio(self):
+    """
+    Iterate over portfolios with a corresponding State Machine that have not completed.
+    """
     for portfolio_id in Portfolios.get_portfolios_pending_provisioning():
         provision_portfolio.delay(portfolio_id=portfolio_id)
 

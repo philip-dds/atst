@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, JSON, text, ForeignKey
+from sqlalchemy import Column, String, text, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import ARRAY
 from sqlalchemy.dialects.postgresql import UUID
@@ -11,6 +11,9 @@ from atst.models.portfolio_role import PortfolioRole, Status as PortfolioRoleSta
 from atst.domain.permission_sets import PermissionSets
 from atst.utils import first_or_none
 from atst.database import db
+
+from sqlalchemy_json import NestedMutableJson
+
 
 
 class Portfolio(
@@ -33,7 +36,7 @@ class Portfolio(
     native_apps = Column(String)  # Native Apps
     team_experience = Column(String)  # Team Experience
 
-    csp_data = Column(JSON, nullable=True)
+    csp_data = Column(NestedMutableJson, nullable=True)
 
     applications = relationship(
         "Application",

@@ -328,3 +328,9 @@ def test_do_provision_portfolio(csp, session, portfolio):
     session.refresh(portfolio)
     assert portfolio.state_machine
 
+def test_provision_portfolio_create_tenant(csp, session, portfolio, celery_app, celery_worker, monkeypatch):
+    sm = PortfolioStateMachineFactory.create(portfolio=portfolio)
+    #mock = Mock()
+    #monkeypatch.setattr("atst.jobs.provision_portfolio", mock)
+    #dispatch_provision_portfolio.run()
+    #mock.delay.assert_called_once_with(portfolio_id=portfolio.id)

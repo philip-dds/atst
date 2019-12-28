@@ -1,17 +1,16 @@
 from typing import List
 from uuid import UUID
+from transitions import Machine
 
 from atst.database import db
 from atst.domain.permission_sets import PermissionSets
 from atst.domain.authz import Authorization
 from atst.domain.portfolio_roles import PortfolioRoles
-from atst.domain.portfolios.portfolio_state_machines import PortfolioStateMachines
 
 from atst.domain.invitations import PortfolioInvitations
 from atst.models import Portfolio, PortfolioStateMachine, FSMStates, Permissions, PortfolioRole, PortfolioRoleStatus
 
-
-from .query import PortfoliosQuery
+from .query import PortfoliosQuery, PortfolioStateMachinesQuery
 from .scopes import ScopedPortfolio
 
 
@@ -23,19 +22,25 @@ class PortfolioDeletionApplicationsExistError(Exception):
     pass
 
 
+
+class PortfolioStateMachines(object):
+
+    @classmethod
+    def create(cls, portfolio, **sm_attrs):
+        sm_attrs.update({'portfolio': portfolio})
+        sm = PortfolioStateMachinesQuery.create(**sm_attrs)
+        return sm
+
 class Portfolios(object):
 
     @classmethod
-    def provision_to_csp(cls, portfolio):
+    def create_state_machine(cls, portfolio):
         """
-        create Portfolio State Machine
+        create Portfolio State Machine for a Portfolio
         """
         if not portfolio.state_machine:
             fsm = PortfolioStateMachines.create(portfolio)
-            print("kicked off provisioning for portfolio <%s> state <%s>" % (
-                portfolio.id, fsm.state))
             return fsm
-        return portfolio.state_machine
 
     @classmethod
     def create(cls, user, portfolio_attrs):
@@ -138,12 +143,22 @@ class Portfolios(object):
     @classmethod
     def get_portfolios_pending_provisioning(cls) -> List[UUID]:
         """
-        Any portfolio with a corresponding State Machine that has not completed.
+        Any portfolio with a corresponding State Machine that is either:
+            not started yet,
+            failed in creating a tenant
+            failed
         """
+
         results = (
             cls.base_provision_query().\
                 join(PortfolioStateMachine).\
-                filter(PortfolioStateMachine.state != FSMStates.COMPLETED)
+                filter(
+                    or_(
+                        PortfolioStateMachine.state == FSMStates.UNSTARTED,
+                        PortfolioStateMachine.state == FSMStates.FAILED,
+                        PortfolioStateMachine.state == FSMStates.TENANT_CREATION_FAILED,
+                    )
+                )
         )
         return [id_ for id_, in results]
 

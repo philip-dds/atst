@@ -1,6 +1,7 @@
 from atst.app import make_config, make_app
 from atst.database import db
 from atst.models import *
+from atst.domain.portfolios import *
 
 app = make_app(make_config())
 ctx = app.app_context()
