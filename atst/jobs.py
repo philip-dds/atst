@@ -156,6 +156,11 @@ def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
 
     print("running Provision Portfolio handler <%s> state: %s" % (portfolio.name, fsm.state))
 
+    # states are tagged
+    #fsm.machine.get_state(fsm.state).is_system
+    #fsm.machine.get_state(fsm.state).is_tenant_creation
+    #fsm.machine.get_state(fsm.state).is_billing_profile_creation
+
     if fsm.state == FSMStates.UNSTARTED:
         fsm.init()
 
