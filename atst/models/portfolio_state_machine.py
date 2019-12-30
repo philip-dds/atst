@@ -24,24 +24,27 @@ class FSMStates(Enum):
     STARTED = "started"
     COMPLETED = "completed"
     FAILED = "failed"
+
     TENANT_CREATED = "tenant created"
     TENANT_CREATION_IN_PROGRESS = "tenant creation in progress"
     TENANT_CREATION_FAILED = "tenant creation failed"
 
+    BILLING_PROFILE_CREATED = "billing profile created"
+    BILLING_PROFILE_CREATION_IN_PROGRESS = "billing profile creation in progress"
+    BILLING_PROFILE_CREATION_FAILED = "billing profile creation failed"
 
-class AzureFSMMixin():
+    BILLING_PROFILE_UPDATED = "billing profile updated"
+    BILLING_PROFILE_UPDATE_IN_PROGRESS = "billing profile update in progress"
+    BILLING_PROFILE_UPDATE_FAILED = "billing profile update failed"
 
-    def prepare_init(self, event): pass
-    def before_init(self, event): pass
-    def after_init(self, event): pass
+    ADMIN_SUBSCRIPTION_CREATED = "admin subscription created"
+    ADMIN_SUBSCRIPTION_CREATION_IN_PROGRESS = "admin subscription creation in progress"
+    ADMIN_SUBSCRIPTION_CREATION_FAILED = "admin subscription creation failed"
 
-    def prepare_start(self, event): pass
-    def before_start(self, event): pass
-    def after_start(self, event): pass
 
-    def prepare_reset(self, event): pass
-    def before_reset(self, event): pass
-    def after_reset(self, event): pass
+class AzureTenantCreationModel():
+    def __init__(self, portfolio):
+        self.portfolio = portfolio
 
     def prepare_create_tenant(self, event): pass
     def before_create_tenant(self, event): pass
@@ -76,11 +79,13 @@ class AzureFSMMixin():
             # failed all attempts
             self.machine.fail_create_tenant()
 
+
         if self.portfolio.csp_data is None:
-           self.portfolio.csp_data = {}
+            self.portfolio.csp_data = {}
         self.portfolio.csp_data["tenant_data"] = response
         db.session.add(self.portfolio)
         db.session.commit()
+
 
     def is_tenant_created(self, event):
         # check portfolio csp details json field for fields
@@ -95,6 +100,78 @@ class AzureFSMMixin():
             "user_id" in self.portfolio.csp_data['tenant_data'],
             "user_object_id" in self.portfolio.csp_data['tenant_data'],
         ])
+
+class AzureBillingProfileCreationModel:
+
+    def __init__(self, portfolio):
+        self.portfolio = portfolio
+
+    def prepare_create_billing_profile(self, event): pass
+    def before_create_billing_profile(self, event): pass
+
+    def after_create_billing_profile(self, event):
+        # enter in_progress state and make api call
+        # after state transitions to BILLING_CREATION_IN_PROGRESS.
+        kwargs = dict(
+                {"username": "mock-cloud", "pass": "shh"},
+                {},
+                '123',
+        )
+
+        csp = event.kwargs.get('csp')
+
+        if csp is not None:
+            self.csp = AzureCSP(app).cloud
+        else:
+            self.csp = MockCSP(app).cloud
+
+        for attempt in range(5):
+            try:
+                response = self.csp.create_billing_profile(**kwargs)
+            except (ConnectionException, UnknownServerException) as exc:
+                print('caught exception. retry', attempt)
+                continue
+            else: break
+        else:
+            # failed all attempts
+            self.machine.fail_create_billing_profile()
+
+
+        if self.portfolio.csp_data is None:
+           self.portfolio.csp_data = {}
+        self.portfolio.csp_data["billing_profile_data"] = response
+        db.session.add(self.portfolio)
+        db.session.commit()
+
+    def is_billing_profile_created(self, event):
+        # check portfolio csp details json field for fields
+
+        if self.portfolio.csp_data is None or \
+                not isinstance(self.portfolio.csp_data, dict):
+            return False
+
+        return all([
+            #"tenant_data" in self.portfolio.csp_data,
+            #"tenant_id" in self.portfolio.csp_data['tenant_data'],
+            #"user_id" in self.portfolio.csp_data['tenant_data'],
+            #"user_object_id" in self.portfolio.csp_data['tenant_data'],
+        ])
+
+class AzureFSMMixin():
+
+    def prepare_init(self, event): pass
+    def before_init(self, event): pass
+    def after_init(self, event):
+        self.portfolio = event.kwargs.get('portfolio')
+
+    def prepare_start(self, event): pass
+    def before_start(self, event): pass
+    def after_start(self, event): pass
+
+    def prepare_reset(self, event): pass
+    def before_reset(self, event): pass
+    def after_reset(self, event): pass
+
 
 
 class PortfolioStateMachine(
@@ -125,6 +202,13 @@ class PortfolioStateMachine(
 
     @reconstructor
     def init_machine(self):
+        """
+
+        this is called as a result of a sqlalchemy query
+
+        attach a machine depending on the current state
+
+        """
 
         self.machine = Machine(
                 model = self,
@@ -145,23 +229,55 @@ class PortfolioStateMachine(
         )
         self.machine.add_transition(trigger="fail", source="*", dest=FSMStates.FAILED)
 
-        self.machine.add_transition("create_tenant",
+        if self.state in [
                 FSMStates.STARTED,
-                FSMStates.TENANT_CREATION_IN_PROGRESS,
-                prepare="prepare_create_tenant",
-                before="before_create_tenant",
-                after="after_create_tenant",
-        )
-        self.machine.add_transition("finish_create_tenant",
-                FSMStates.TENANT_CREATION_IN_PROGRESS,
-                FSMStates.TENANT_CREATED,
-                conditions=["is_tenant_created",],
-        )
-        self.machine.add_transition("fail_create_tenant",
-                FSMStates.TENANT_CREATION_IN_PROGRESS,
                 FSMStates.TENANT_CREATION_FAILED,
-        )
+                FSMStates.TENANT_CREATION_IN_PROGRESS,
+                ]:
+            azure_tenant_model = AzureTenantCreationModel(self.portfolio)
+            self.machine.add_model(azure_tenant_model)
 
+            self.machine.add_transition("create_tenant",
+                    FSMStates.STARTED,
+                    FSMStates.TENANT_CREATION_IN_PROGRESS,
+                    prepare=azure_tenant_model.prepare_create_tenant,
+                    before=azure_tenant_model.before_create_tenant,
+                    after=azure_tenant_model.after_create_tenant,
+            )
+            self.machine.add_transition("finish_create_tenant",
+                    FSMStates.TENANT_CREATION_IN_PROGRESS,
+                    FSMStates.TENANT_CREATED,
+                    conditions=[azure_tenant_model.is_tenant_created,],
+            )
+            self.machine.add_transition("fail_create_tenant",
+                    FSMStates.TENANT_CREATION_IN_PROGRESS,
+                    FSMStates.TENANT_CREATION_FAILED,
+            )
+
+        if self.state in [
+                FSMStates.TENANT_CREATED,
+                FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
+                FSMStates.BILLING_PROFILE_CREATION_FAILED,
+                ]:
+            azure_billing_profile_creation_model = AzureBillingProfileCreationModel(self.portfolio)
+            self.machine.add_model(azure_billing_profile_creation_model)
+
+            self.machine.add_transition("create_billing_profile",
+                    FSMStates.TENANT_CREATED,
+                    FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
+                    prepare=azure_billing_profile_creation_model.prepare_create_billing_profile,
+                    before=azure_billing_profile_creation_model.before_create_billing_profile,
+                    after=azure_billing_profile_creation_model.after_create_billing_profile,
+            )
+            self.machine.add_transition("finish_create_billing_profile",
+                    FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
+                    FSMStates.BILLING_PROFILE_CREATED,
+                    conditions=[azure_billing_profile_creation_model.is_billing_profile_created,],
+            )
+            self.machine.add_transition("fail_create_billing_profile",
+                    FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
+                    FSMStates.BILLING_PROFILE_CREATION_FAILED,
+            )
 
     @property
     def application_id(self):

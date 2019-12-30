@@ -351,6 +351,50 @@ class MockCloudProvider(CloudProviderInterface):
             "user_object_id": response["objectId"],
         }
 
+
+    def create_billing_profile(self, creds, tenant_admin_details, billing_owner_id):
+        # call billing profile creation endpoint, specifying owner
+        # Payload:
+        """
+        {
+            "displayName": "string",
+            "poNumber": "string",
+            "address": {
+                "firstName": "string",
+                "lastName": "string",
+                "companyName": "string",
+                "addressLine1": "string",
+                "addressLine2": "string",
+                "addressLine3": "string",
+                "city": "string",
+                "region": "string",
+                "country": "string",
+                "postalCode": "string"
+            },
+            "invoiceEmailOptIn": true,
+            Note: These last 2 are also the body for adding/updating new TOs/clins
+            "enabledAzurePlans": [
+                {
+                "skuId": "string"
+                }
+            ],
+            "clinBudget": {
+                "amount": 0,
+                "startDate": "2019-12-18T16:47:40.909Z",
+                "endDate": "2019-12-18T16:47:40.909Z",
+                "externalReferenceId": "string"
+            }
+        }
+        """
+        # response will be mostly the same as the body, but we only really care about the id
+        self._maybe_raise(self.NETWORK_FAILURE_PCT, self.NETWORK_EXCEPTION)
+        self._maybe_raise(self.SERVER_FAILURE_PCT, self.SERVER_EXCEPTION)
+        self._maybe_raise(self.UNAUTHORIZED_RATE, self.AUTHORIZATION_EXCEPTION)
+
+        response = {"id": "string"}
+        return {"billing_profile_id": response["id"]}
+
+
     def create_or_update_user(self, auth_credentials, user_info, csp_role_id):
         self._authorize(auth_credentials)
 
