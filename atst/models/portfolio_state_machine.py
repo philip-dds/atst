@@ -42,29 +42,33 @@ class FSMStates(Enum):
     ADMIN_SUBSCRIPTION_CREATION_IN_PROGRESS = "admin subscription creation in progress"
     ADMIN_SUBSCRIPTION_CREATION_FAILED = "admin subscription creation failed"
 
-fsm_states_base = [
-    {'name': FSMStates.UNSTARTED.name, 'tags': ['system']},
-    {'name': FSMStates.STARTING.name, 'tags': ['system']},
-    {'name': FSMStates.STARTED.name, 'tags': ['system']},
-    {'name': FSMStates.FAILED.name, 'tags': ['system']},
-    {'name': FSMStates.COMPLETED.name, 'tags': ['system']},
-]
 
-fsm_tenant_creation_states = [
-    {'name': FSMStates.TENANT_CREATED.name, 'tags': ['tenant_creation']},
-    {'name': FSMStates.TENANT_CREATION_IN_PROGRESS.name, 'tags': ['tenant_creation']},
-    {'name': FSMStates.TENANT_CREATION_FAILED.name, 'tags': ['tenant_creation']},
-]
+class TenantCreationMixin():
 
-fsm_billing_profile_creation_states = [
-    {'name': FSMStates.TENANT_CREATED.name, 'tags': ['billing_profile_creation']},
-    {'name': FSMStates.TENANT_CREATION_IN_PROGRESS.name, 'tags': ['billing_profile_creation']},
-    {'name': FSMStates.TENANT_CREATION_FAILED.name, 'tags': ['billing_profile_creation']},
-]
+    tenant_creation_states = [
+        {'name': FSMStates.TENANT_CREATED.name, 'tags': ['tenant_creation']},
+        {'name': FSMStates.TENANT_CREATION_IN_PROGRESS.name, 'tags': ['tenant_creation', 'in_progress']},
+        {'name': FSMStates.TENANT_CREATION_FAILED.name, 'tags': ['tenant_creation']},
+    ]
 
-class AzureTenantCreationModel():
-    def __init__(self, portfolio):
-        self.portfolio = portfolio
+    transitions_tenant_creation = [
+        {
+            'trigger': 'create_tenant',
+            'source': FSMStates.STARTED, 'dest': FSMStates.TENANT_CREATION_IN_PROGRESS,
+            'prepare': 'prepare_create_tenant',
+            'before': 'before_create_tenant',
+            'after': 'after_create_tenant',
+        },
+        {
+            'trigger': 'finish_create_tenant',
+            'source': FSMStates.TENANT_CREATION_IN_PROGRESS, 'dest': FSMStates.TENANT_CREATED,
+            'conditions': ['is_tenant_created',],
+        },
+        {
+            'trigger': 'fail_create_tenant',
+            'source': FSMStates.TENANT_CREATION_IN_PROGRESS, 'dest': FSMStates.TENANT_CREATION_FAILED
+        },
+    ]
 
     def prepare_create_tenant(self, event): pass
     def before_create_tenant(self, event): pass
@@ -121,10 +125,35 @@ class AzureTenantCreationModel():
             "user_object_id" in self.portfolio.csp_data['tenant_data'],
         ])
 
-class AzureBillingProfileCreationModel:
+class BillingProfileCreationMixin:
 
-    def __init__(self, portfolio):
-        self.portfolio = portfolio
+    billing_profile_creation_states = [
+        {'name': FSMStates.TENANT_CREATED.name, 'tags': ['billing_profile_creation']},
+        {'name': FSMStates.TENANT_CREATION_IN_PROGRESS.name, 'tags': ['billing_profile_creation', 'in_progress']},
+        {'name': FSMStates.TENANT_CREATION_FAILED.name, 'tags': ['billing_profile_creation']},
+    ]
+
+    transitions_billing_profile_creation = [
+        {
+            'trigger': 'create_billing_profile',
+            'source': FSMStates.STARTED,
+            'dest': FSMStates.TENANT_CREATION_IN_PROGRESS,
+            'prepare': 'prepare_create_billing_profile',
+            'before': 'before_create_billing_profile',
+            'after': 'after_create_billing_profile',
+        },
+        {
+            'trigger': 'finish_create_billing_profile',
+            'source': FSMStates.TENANT_CREATION_IN_PROGRESS,
+            'dest': FSMStates.TENANT_CREATED,
+            'conditions': ['is_billing_profile_created',],
+        },
+        {
+            'trigger': 'fail_create_billing_profile',
+            'source': FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
+            'dest': FSMStates.BILLING_PROFILE_CREATION_FAILED
+        },
+    ]
 
     def prepare_create_billing_profile(self, event): pass
     def before_create_billing_profile(self, event): pass
@@ -179,10 +208,24 @@ class AzureBillingProfileCreationModel:
 
 class AzureFSMMixin():
 
+    states_base = [
+        {'name': FSMStates.UNSTARTED.name, 'tags': ['system']},
+        {'name': FSMStates.STARTING.name, 'tags': ['system']},
+        {'name': FSMStates.STARTED.name, 'tags': ['system']},
+        {'name': FSMStates.FAILED.name, 'tags': ['system']},
+        {'name': FSMStates.COMPLETED.name, 'tags': ['system']},
+    ]
+
+    transitions_base = [
+        {'trigger': 'init', 'source': FSMStates.UNSTARTED, 'dest': FSMStates.STARTING},
+        {'trigger': 'start', 'source': FSMStates.STARTING, 'dest': FSMStates.STARTED},
+        {'trigger': 'reset', 'source': '*', 'dest': FSMStates.UNSTARTED},
+        {'trigger': 'fail', 'source': '*', 'dest': FSMStates.FAILED,}
+    ]
+
     def prepare_init(self, event): pass
     def before_init(self, event): pass
-    def after_init(self, event):
-        self.portfolio = event.kwargs.get('portfolio')
+    def after_init(self, event): pass
 
     def prepare_start(self, event): pass
     def before_start(self, event): pass
@@ -197,10 +240,11 @@ class AzureFSMMixin():
 class StateMachineWithTags(Machine):
     pass
 
-
-
 class PortfolioStateMachine(
-    Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin, AzureFSMMixin
+    Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin,
+    AzureFSMMixin,
+    TenantCreationMixin,
+    BillingProfileCreationMixin,
 ):
     __tablename__ = "portfolio_state_machines"
 
@@ -227,89 +271,29 @@ class PortfolioStateMachine(
 
     @reconstructor
     def attach_machine(self):
+        """ This is called as a result of a sqlalchemy query.  Attach a machine depending on the current state.
         """
-
-        this is called as a result of a sqlalchemy query
-
-        attach a machine depending on the current state
-
-        """
-
-        states = fsm_states_base  + fsm_tenant_creation_states + fsm_billing_profile_creation_states
-
         self.machine = StateMachineWithTags(
                 model = self,
-                states=states, #FSMStates,
                 send_event=True,
                 initial=self.state.name if self.state else FSMStates.UNSTARTED.name,
                 auto_transitions=False,
                 after_state_change='after_state_change',
         )
-        self.machine.add_transition(trigger="init", source=FSMStates.UNSTARTED, dest=FSMStates.STARTING,
-                prepare="prepare_init", before="before_init", after="after_init",
-        )
-        self.machine.add_transition(trigger="start", source=FSMStates.STARTING, dest=FSMStates.STARTED,
-                prepare="prepare_start", before="before_start", after="after_start",
-        )
-        self.machine.add_transition(trigger="reset", source="*", dest=FSMStates.UNSTARTED,
-                prepare="prepare_reset", before="before_reset", after="after_reset",
-        )
-        self.machine.add_transition(trigger="fail", source="*", dest=FSMStates.FAILED)
+        #TODO see if based on current state tag some of these states/transitions can be excluded
+        #if self.machine.get_state(self.state).is_system
+        #if self.machine.get_state(self.state).is_tenant_creation
+        #if self.machine.get_state(self.state).is_billing_profile_creation
 
-        #if self.state in [
-        #        FSMStates.STARTED,
-        #        FSMStates.TENANT_CREATION_IN_PROGRESS,
-        #        FSMStates.TENANT_CREATION_FAILED,
-        #        ]:
-        self.init_tenant_creation()
-
-        #if self.state in [
-        #        FSMStates.TENANT_CREATED,
-        #        FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
-        #        FSMStates.BILLING_PROFILE_CREATION_FAILED,
-        #        ]:
-        self.init_billing_profile_creation()
-
-    def init_tenant_creation(self):
-        azure_tenant_model = AzureTenantCreationModel(self.portfolio)
-        self.machine.add_model(azure_tenant_model)
-
-        self.machine.add_transition("create_tenant",
-                FSMStates.STARTED,
-                FSMStates.TENANT_CREATION_IN_PROGRESS,
-                prepare=azure_tenant_model.prepare_create_tenant,
-                before=azure_tenant_model.before_create_tenant,
-                after=azure_tenant_model.after_create_tenant,
+        self.machine.add_states(
+            self.states_base  +
+            self.tenant_creation_states +
+            self.billing_profile_creation_states
         )
-        self.machine.add_transition("finish_create_tenant",
-                FSMStates.TENANT_CREATION_IN_PROGRESS,
-                FSMStates.TENANT_CREATED,
-                conditions=[azure_tenant_model.is_tenant_created,],
-        )
-        self.machine.add_transition("fail_create_tenant",
-                FSMStates.TENANT_CREATION_IN_PROGRESS,
-                FSMStates.TENANT_CREATION_FAILED,
-        )
-
-    def init_billing_profile_creation(self):
-        azure_billing_profile_creation_model = AzureBillingProfileCreationModel(self.portfolio)
-        self.machine.add_model(azure_billing_profile_creation_model)
-
-        self.machine.add_transition("create_billing_profile",
-                FSMStates.TENANT_CREATED,
-                FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
-                prepare=azure_billing_profile_creation_model.prepare_create_billing_profile,
-                before=azure_billing_profile_creation_model.before_create_billing_profile,
-                after=azure_billing_profile_creation_model.after_create_billing_profile,
-        )
-        self.machine.add_transition("finish_create_billing_profile",
-                FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
-                FSMStates.BILLING_PROFILE_CREATED,
-                conditions=[azure_billing_profile_creation_model.is_billing_profile_created,],
-        )
-        self.machine.add_transition("fail_create_billing_profile",
-                FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
-                FSMStates.BILLING_PROFILE_CREATION_FAILED,
+        self.machine.add_transitions(
+            self.transitions_base +
+            self.transitions_tenant_creation +
+            self.transitions_billing_profile_creation
         )
 
     @property
