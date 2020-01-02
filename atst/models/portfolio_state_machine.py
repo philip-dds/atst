@@ -27,55 +27,55 @@ class FSMStates(Enum):
     FAILED = "failed"
 
     TENANT_CREATED = "tenant created"
-    TENANT_CREATION_IN_PROGRESS = "tenant creation in progress"
-    TENANT_CREATION_FAILED = "tenant creation failed"
+    TENANT_IN_PROGRESS = "tenant creation in progress"
+    TENANT_FAILED = "tenant creation failed"
 
     BILLING_PROFILE_CREATED = "billing profile created"
-    BILLING_PROFILE_CREATION_IN_PROGRESS = "billing profile creation in progress"
-    BILLING_PROFILE_CREATION_FAILED = "billing profile creation failed"
+    BILLING_PROFILE_IN_PROGRESS = "billing profile creation in progress"
+    BILLING_PROFILE_FAILED = "billing profile creation failed"
 
     BILLING_PROFILE_UPDATED = "billing profile updated"
     BILLING_PROFILE_UPDATE_IN_PROGRESS = "billing profile update in progress"
     BILLING_PROFILE_UPDATE_FAILED = "billing profile update failed"
 
     ADMIN_SUBSCRIPTION_CREATED = "admin subscription created"
-    ADMIN_SUBSCRIPTION_CREATION_IN_PROGRESS = "admin subscription creation in progress"
-    ADMIN_SUBSCRIPTION_CREATION_FAILED = "admin subscription creation failed"
+    ADMIN_SUBSCRIPTION_IN_PROGRESS = "admin subscription creation in progress"
+    ADMIN_SUBSCRIPTION_FAILED = "admin subscription creation failed"
 
 
-class TenantCreationMixin():
+class TenantMixin():
 
-    tenant_creation_states = [
-        {'name': FSMStates.TENANT_CREATED.name, 'tags': ['tenant_creation']},
-        {'name': FSMStates.TENANT_CREATION_IN_PROGRESS.name, 'tags': ['tenant_creation', 'in_progress']},
-        {'name': FSMStates.TENANT_CREATION_FAILED.name, 'tags': ['tenant_creation']},
+    tenant_states = [
+        {'name': FSMStates.TENANT_CREATED.name, 'tags': ['tenant']},
+        {'name': FSMStates.TENANT_IN_PROGRESS.name, 'tags': ['tenant', 'in_progress']},
+        {'name': FSMStates.TENANT_FAILED.name, 'tags': ['tenant']},
     ]
 
-    transitions_tenant_creation = [
+    transitions_tenant = [
         {
             'trigger': 'create_tenant',
-            'source': FSMStates.STARTED, 'dest': FSMStates.TENANT_CREATION_IN_PROGRESS,
-            'prepare': 'prepare_create_tenant',
-            'before': 'before_create_tenant',
-            'after': 'after_create_tenant',
+            'source': FSMStates.STARTED, 'dest': FSMStates.TENANT_IN_PROGRESS,
+            'prepare': 'prepare_tenant',
+            'before': 'before_tenant',
+            'after': 'after_tenant',
         },
         {
-            'trigger': 'finish_create_tenant',
-            'source': FSMStates.TENANT_CREATION_IN_PROGRESS, 'dest': FSMStates.TENANT_CREATED,
+            'trigger': 'finish_tenant',
+            'source': FSMStates.TENANT_IN_PROGRESS, 'dest': FSMStates.TENANT_CREATED,
             'conditions': ['is_tenant_created',],
         },
         {
-            'trigger': 'fail_create_tenant',
-            'source': FSMStates.TENANT_CREATION_IN_PROGRESS, 'dest': FSMStates.TENANT_CREATION_FAILED
+            'trigger': 'fail_tenant',
+            'source': FSMStates.TENANT_IN_PROGRESS, 'dest': FSMStates.TENANT_FAILED
         },
     ]
 
-    def prepare_create_tenant(self, event): pass
-    def before_create_tenant(self, event): pass
+    def prepare_tenant(self, event): pass
+    def before_tenant(self, event): pass
 
-    def after_create_tenant(self, event):
+    def after_tenant(self, event):
         # enter in_progress state and make api call
-        # after state transitions to TENANT_CREATION_IN_PROGRESS.
+        # after state transitions to TENANT_IN_PROGRESS.
         kwargs = dict(creds={"username": "mock-cloud", "pass": "shh"},
                     user_id='123',
                     password='123',
@@ -101,7 +101,7 @@ class TenantCreationMixin():
             else: break
         else:
             # failed all attempts
-            self.machine.fail_create_tenant()
+            self.machine.fail_tenant()
 
 
         if self.portfolio.csp_data is None:
@@ -125,49 +125,45 @@ class TenantCreationMixin():
             "user_object_id" in self.portfolio.csp_data['tenant_data'],
         ])
 
-class BillingProfileCreationMixin:
+class BillingProfileMixin:
 
-    billing_profile_creation_states = [
-        {'name': FSMStates.TENANT_CREATED.name, 'tags': ['billing_profile_creation']},
-        {'name': FSMStates.TENANT_CREATION_IN_PROGRESS.name, 'tags': ['billing_profile_creation', 'in_progress']},
-        {'name': FSMStates.TENANT_CREATION_FAILED.name, 'tags': ['billing_profile_creation']},
+    billing_profile_states = [
+        {'name': FSMStates.BILLING_PROFILE_CREATED.name, 'tags': ['billing_profile']},
+        {'name': FSMStates.BILLING_PROFILE_IN_PROGRESS.name, 'tags': ['billing_profile', 'in_progress']},
+        {'name': FSMStates.BILLING_PROFILE_FAILED.name, 'tags': ['billing_profile']},
     ]
 
-    transitions_billing_profile_creation = [
+    transitions_billing_profile = [
         {
             'trigger': 'create_billing_profile',
-            'source': FSMStates.STARTED,
-            'dest': FSMStates.TENANT_CREATION_IN_PROGRESS,
-            'prepare': 'prepare_create_billing_profile',
-            'before': 'before_create_billing_profile',
-            'after': 'after_create_billing_profile',
+            'source': FSMStates.TENANT_CREATED,
+            'dest': FSMStates.BILLING_PROFILE_IN_PROGRESS,
+            'prepare': 'prepare_billing_profile',
+            'before': 'before_billing_profile',
+            'after': 'after_billing_profile',
         },
         {
-            'trigger': 'finish_create_billing_profile',
-            'source': FSMStates.TENANT_CREATION_IN_PROGRESS,
-            'dest': FSMStates.TENANT_CREATED,
+            'trigger': 'finish_billing_profile',
+            'source': FSMStates.BILLING_PROFILE_IN_PROGRESS,
+            'dest': FSMStates.BILLING_PROFILE_CREATED,
             'conditions': ['is_billing_profile_created',],
         },
         {
-            'trigger': 'fail_create_billing_profile',
-            'source': FSMStates.BILLING_PROFILE_CREATION_IN_PROGRESS,
-            'dest': FSMStates.BILLING_PROFILE_CREATION_FAILED
+            'trigger': 'fail_billing_profile',
+            'source': FSMStates.BILLING_PROFILE_IN_PROGRESS,
+            'dest': FSMStates.BILLING_PROFILE_FAILED
         },
     ]
 
-    def prepare_create_billing_profile(self, event): pass
-    def before_create_billing_profile(self, event): pass
+    def prepare_billing_profile(self, event): pass
+    def before_billing_profile(self, event): pass
 
-    def after_create_billing_profile(self, event):
+    def after_billing_profile(self, event):
         # enter in_progress state and make api call
-        # after state transitions to BILLING_CREATION_IN_PROGRESS.
-        kwargs = dict(
-                {"username": "mock-cloud", "pass": "shh"},
-                {},
-                '123',
-        )
+        # after state transitions to BILLING_IN_PROGRESS.
 
         csp = event.kwargs.get('csp')
+        creds={"username": "mock-cloud", "pass": "shh"}
 
         if csp is not None:
             self.csp = AzureCSP(app).cloud
@@ -176,14 +172,14 @@ class BillingProfileCreationMixin:
 
         for attempt in range(5):
             try:
-                response = self.csp.create_billing_profile(**kwargs)
+                response = self.csp.create_billing_profile({}, '123', **kwargs)
             except (ConnectionException, UnknownServerException) as exc:
                 print('caught exception. retry', attempt)
                 continue
             else: break
         else:
             # failed all attempts
-            self.machine.fail_create_billing_profile()
+            self.machine.fail_billing_profile()
 
 
         if self.portfolio.csp_data is None:
@@ -243,8 +239,8 @@ class StateMachineWithTags(Machine):
 class PortfolioStateMachine(
     Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin,
     AzureFSMMixin,
-    TenantCreationMixin,
-    BillingProfileCreationMixin,
+    TenantMixin,
+    BillingProfileMixin,
 ):
     __tablename__ = "portfolio_state_machines"
 
@@ -285,16 +281,52 @@ class PortfolioStateMachine(
         #if self.machine.get_state(self.state).is_tenant_creation
         #if self.machine.get_state(self.state).is_billing_profile_creation
 
-        self.machine.add_states(
-            self.states_base  +
-            self.tenant_creation_states +
-            self.billing_profile_creation_states
-        )
-        self.machine.add_transitions(
-            self.transitions_base +
-            self.transitions_tenant_creation +
-            self.transitions_billing_profile_creation
-        )
+
+        self.machine.add_states(self.states_base)
+        self.machine.add_transitions(self.transitions_base)
+
+        PROVISION_STAGE_STATES = ['IN_PROGRESS', 'CREATED', 'FAILED']
+        PROVISION_STAGES = ['TENANT', 'BILLING_PROFILE']
+        states = []
+        transitions = []
+        fsmstate = lambda stage, state: FSMStates.__members__.get("_".join([stage, state]))
+        for stage_i, stage in enumerate(PROVISION_STAGES):
+            for state_i, state in enumerate(PROVISION_STAGE_STATES):
+                states.append(dict(name=fsmstate(stage, state).name, tags=[stage, state]))
+                if state_i == 0:
+                    if stage_i > 0:
+                        src = fsmstate(PROVISION_STAGES[stage_i-1], 'CREATED')
+                    else:
+                        src=FSMStages.STARTED
+                    transitions.append(
+                        dict(
+                            trigger='create_'+stage.lower(),
+                            source=src, dest=stage+"_"+state,
+                            prepare='prepare_' + stage.lower(),
+                            before='before_' + stage.lower(),
+                            after='after_' + stage.lower(),
+                        )
+                    )
+                elif state_i == 1:
+                    transitions.append(
+                        dict(
+                            trigger='create_'+stage.lower(),
+                            source='',
+                            dest='',
+                        )
+                    )
+                elif state_i == 0:
+                    transitions.append(
+                        dict(
+                            trigger='create_'+stage.lower(),
+                            source='',
+                            dest='',
+                        )
+                    )
+
+        self.machine.add_states(states)
+        self.machine.add_transitions(transitions)
+
 
     @property
     def application_id(self):
