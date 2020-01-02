@@ -42,32 +42,6 @@ for stage in FSMStages:
 FSMStates = Enum('FSMStates', states)
 
 
-"""
-class FSMStates(Enum):
-    UNSTARTED = "unstarted"
-    STARTING = "starting"
-    STARTED = "started"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-    TENANT_CREATED = "tenant created"
-    TENANT_IN_PROGRESS = "tenant creation in progress"
-    TENANT_FAILED = "tenant creation failed"
-
-    BILLING_PROFILE_CREATED = "billing profile created"
-    BILLING_PROFILE_IN_PROGRESS = "billing profile creation in progress"
-    BILLING_PROFILE_FAILED = "billing profile creation failed"
-
-    BILLING_PROFILE_UPDATED = "billing profile updated"
-    BILLING_PROFILE_UPDATE_IN_PROGRESS = "billing profile update in progress"
-    BILLING_PROFILE_UPDATE_FAILED = "billing profile update failed"
-
-    ADMIN_SUBSCRIPTION_CREATED = "admin subscription created"
-    ADMIN_SUBSCRIPTION_IN_PROGRESS = "admin subscription creation in progress"
-    ADMIN_SUBSCRIPTION_FAILED = "admin subscription creation failed"
-"""
-
-
 class TenantMixin():
 
     tenant_states = [
