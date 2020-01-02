@@ -18,7 +18,31 @@ import atst.models.mixins as mixins
 from atst.database import db
 
 
+class FSMStageStates(Enum):
+    CREATED = "created"
+    IN_PROGRESS = "in progress"
+    FAILED = "failed"
 
+class FSMStages(Enum):
+    TENANT = "tenant"
+    BILLING_PROFILE = "billing profile"
+    ADMIN_SUBSCRIPTION = "admin subscription"
+
+states = {
+    'UNSTARTED' : "unstarted",
+    'STARTING' : "starting",
+    'STARTED' : "started",
+    'COMPLETED' : "completed",
+    'FAILED' : "failed",
+}
+for stage in FSMStages:
+    for state in FSMStageStates:
+        states[stage.name+"_"+state.name] = stage.value+" "+state.value
+
+FSMStates = Enum('FSMStates', states)
+
+
+"""
 class FSMStates(Enum):
     UNSTARTED = "unstarted"
     STARTING = "starting"
@@ -41,6 +65,7 @@ class FSMStates(Enum):
     ADMIN_SUBSCRIPTION_CREATED = "admin subscription created"
     ADMIN_SUBSCRIPTION_IN_PROGRESS = "admin subscription creation in progress"
     ADMIN_SUBSCRIPTION_FAILED = "admin subscription creation failed"
+"""
 
 
 class TenantMixin():
