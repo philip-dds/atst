@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column
 
 #from transitions import Machine
 from transitions.extensions.states import add_state_features, Timeout

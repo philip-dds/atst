@@ -1,6 +1,5 @@
 from typing import List
 from uuid import UUID
-from transitions import Machine
 
 from atst.database import db
 from atst.domain.permission_sets import PermissionSets

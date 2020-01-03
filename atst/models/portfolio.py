@@ -1,7 +1,6 @@
-from sqlalchemy import Column, String, text, ForeignKey
+from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import ARRAY
-from sqlalchemy.dialects.postgresql import UUID
 from itertools import chain
 
 from atst.models.base import Base

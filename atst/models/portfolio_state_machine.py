@@ -1,5 +1,5 @@
 from enum import Enum
-from sqlalchemy import Column, String, Integer, ForeignKey, JSON, text, Enum as SQLAEnum
+from sqlalchemy import Column, ForeignKey, Enum as SQLAEnum
 from sqlalchemy.orm import relationship, reconstructor
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -41,33 +41,7 @@ for stage in FSMStages:
 
 FSMStates = Enum('FSMStates', states)
 
-
 class TenantMixin():
-
-    tenant_states = [
-        {'name': FSMStates.TENANT_CREATED.name, 'tags': ['tenant']},
-        {'name': FSMStates.TENANT_IN_PROGRESS.name, 'tags': ['tenant', 'in_progress']},
-        {'name': FSMStates.TENANT_FAILED.name, 'tags': ['tenant']},
-    ]
-
-    transitions_tenant = [
-        {
-            'trigger': 'create_tenant',
-            'source': FSMStates.STARTED, 'dest': FSMStates.TENANT_IN_PROGRESS,
-            'prepare': 'prepare_tenant',
-            'before': 'before_tenant',
-            'after': 'after_tenant',
-        },
-        {
-            'trigger': 'finish_tenant',
-            'source': FSMStates.TENANT_IN_PROGRESS, 'dest': FSMStates.TENANT_CREATED,
-            'conditions': ['is_tenant_created',],
-        },
-        {
-            'trigger': 'fail_tenant',
-            'source': FSMStates.TENANT_IN_PROGRESS, 'dest': FSMStates.TENANT_FAILED
-        },
-    ]
 
     def prepare_tenant(self, event): pass
     def before_tenant(self, event): pass
@@ -100,7 +74,7 @@ class TenantMixin():
             else: break
         else:
             # failed all attempts
-            self.machine.fail_tenant()
+            self.maFSMStageStateschine.fail_tenant()
 
 
         if self.portfolio.csp_data is None:
@@ -126,34 +100,6 @@ class TenantMixin():
 
 class BillingProfileMixin:
 
-    billing_profile_states = [
-        {'name': FSMStates.BILLING_PROFILE_CREATED.name, 'tags': ['billing_profile']},
-        {'name': FSMStates.BILLING_PROFILE_IN_PROGRESS.name, 'tags': ['billing_profile', 'in_progress']},
-        {'name': FSMStates.BILLING_PROFILE_FAILED.name, 'tags': ['billing_profile']},
-    ]
-
-    transitions_billing_profile = [
-        {
-            'trigger': 'create_billing_profile',
-            'source': FSMStates.TENANT_CREATED,
-            'dest': FSMStates.BILLING_PROFILE_IN_PROGRESS,
-            'prepare': 'prepare_billing_profile',
-            'before': 'before_billing_profile',
-            'after': 'after_billing_profile',
-        },
-        {
-            'trigger': 'finish_billing_profile',
-            'source': FSMStates.BILLING_PROFILE_IN_PROGRESS,
-            'dest': FSMStates.BILLING_PROFILE_CREATED,
-            'conditions': ['is_billing_profile_created',],
-        },
-        {
-            'trigger': 'fail_billing_profile',
-            'source': FSMStates.BILLING_PROFILE_IN_PROGRESS,
-            'dest': FSMStates.BILLING_PROFILE_FAILED
-        },
-    ]
-
     def prepare_billing_profile(self, event): pass
     def before_billing_profile(self, event): pass
 
@@ -162,7 +108,7 @@ class BillingProfileMixin:
         # after state transitions to BILLING_IN_PROGRESS.
 
         csp = event.kwargs.get('csp')
-        creds={"username": "mock-cloud", "pass": "shh"}
+        #creds={"username": "mock-cloud", "pass": "shh"}
 
         if csp is not None:
             self.csp = AzureCSP(app).cloud
@@ -171,7 +117,8 @@ class BillingProfileMixin:
 
         for attempt in range(5):
             try:
-                response = self.csp.create_billing_profile({}, '123', **kwargs)
+                response = self.csp.create_billing_profile()
+                        #{}, '123', **kwargs)
             except (ConnectionException, UnknownServerException) as exc:
                 print('caught exception. retry', attempt)
                 continue
@@ -280,52 +227,54 @@ class PortfolioStateMachine(
         #if self.machine.get_state(self.state).is_tenant_creation
         #if self.machine.get_state(self.state).is_billing_profile_creation
 
+        states, transitions = self._generate_transitions()
+        self.machine.add_states(self.states_base+states)
+        self.machine.add_transitions(self.transitions_base+transitions)
 
-        self.machine.add_states(self.states_base)
-        self.machine.add_transitions(self.transitions_base)
-
-        PROVISION_STAGE_STATES = ['IN_PROGRESS', 'CREATED', 'FAILED']
-        PROVISION_STAGES = ['TENANT', 'BILLING_PROFILE']
-        states = []
+    def _generate_transitions(self):
         transitions = []
-        fsmstate = lambda stage, state: FSMStates.__members__.get("_".join([stage, state]))
-        for stage_i, stage in enumerate(PROVISION_STAGES):
-            for state_i, state in enumerate(PROVISION_STAGE_STATES):
-                states.append(dict(name=fsmstate(stage, state).name, tags=[stage, state]))
-                if state_i == 0:
+        states = []
+        compose_state = lambda stage, state: getattr(FSMStates, "_".join([stage.name, state.name]))
+
+        for stage_i, stage in enumerate(FSMStages):
+            for state in FSMStageStates:
+                states.append(dict(name=compose_state(stage, state), tags=[stage, state]))
+                if state == FSMStageStates.CREATED:
                     if stage_i > 0:
-                        src = fsmstate(PROVISION_STAGES[stage_i-1], 'CREATED')
+                        src = compose_state(list(FSMStages)[stage_i-1] , FSMStageStates.CREATED)
                     else:
-                        src=FSMStages.STARTED
+                        src = FSMStates.STARTED
                     transitions.append(
                         dict(
-                            trigger='create_'+stage.lower(),
-                            source=src, dest=stage+"_"+state,
-                            prepare='prepare_' + stage.lower(),
-                            before='before_' + stage.lower(),
-                            after='after_' + stage.lower(),
+                            trigger='create_'+stage.name.lower(),
+                            source=src,
+                            dest=compose_state(stage, FSMStageStates.IN_PROGRESS),
+                            prepare='prepare_' + stage.name.lower(),
+                            before='before_' + stage.name.lower(),
+                            after='after_' + stage.name.lower(),
                         )
                     )
-                elif state_i == 1:
+                if state == FSMStageStates.IN_PROGRESS:
                     transitions.append(
                         dict(
-                            trigger='create_'+stage.lower(),
-                            source='',
-                            dest='',
+                            trigger='finish_'+stage.name.lower(),
+                            source=compose_state(stage, state),
+                            dest=compose_state(stage, FSMStageStates.CREATED),
+                            conditions=['is_%s_created' % stage.name.lower()],
                         )
                     )
-                elif state_i == 0:
+                if state == FSMStageStates.FAILED:
                     transitions.append(
                         dict(
-                            trigger='create_'+stage.lower(),
-                            source='',
-                            dest='',
+                            trigger='fail_'+stage.name.lower(),
+                            source=compose_state(stage, FSMStageStates.IN_PROGRESS),
+                            dest=compose_state(stage, FSMStageStates.FAILED),
                         )
                     )
+        for t in transitions:
+            print(t)
 
-        self.machine.add_states(states)
-        self.machine.add_transitions(transitions)
-
+        return states, transitions
 
     @property
     def application_id(self):
