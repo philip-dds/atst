@@ -7,7 +7,6 @@ from atst.models import (
     EnvironmentJobFailure,
     EnvironmentRoleJobFailure,
     EnvironmentRole,
-    Portfolio,
     PortfolioJobFailure,
     FSMStates,
 )
@@ -142,36 +141,14 @@ def do_work(fn, task, csp, **kwargs):
 
 
 def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
-    print("running provision for portfolio <%s>" % (portfolio_id))
-    #portfolios = db.session.query(Portfolio).\
-    #        filter_by(portfolio_id=portfolio_id, deleted=False).all()
     portfolio = Portfolios.get_for_update(portfolio_id)
     if  portfolio.state_machine is None:
         fsm = Portfolios.create_state_machine(portfolio)
         db.session.add(fsm)
         db.session.commit()
-    else:
-        fsm = PortfolioStateMachinesQuery.get(portfolio.state_machine.id)
-        print(fsm.events)
 
-    print("running Provision Portfolio handler <%s> state: %s" % (portfolio.name, fsm.state))
+    portfolio.state_machine.trigger_next_transition(csp)
 
-    # states are tagged
-    #fsm.machine.get_state(fsm.state).is_system
-    #fsm.machine.get_state(fsm.state).is_tenant_creation
-    #fsm.machine.get_state(fsm.state).is_billing_profile_creation
-
-    if fsm.state == FSMStates.UNSTARTED:
-        fsm.init()
-
-    if fsm.state == FSMStates.STARTING:
-        fsm.start()
-
-    if fsm.state == FSMStates.STARTED:
-        fsm.create_tenant(csp=csp.cloud)
-
-    if fsm.state == FSMStates.TENANT_CREATION_IN_PROGRESS:
-        fsm.finish_create_tenant()
 
 @celery.task(bind=True, base=RecordPortfolioFailure)
 def provision_portfolio(self, portfolio_id=None):
