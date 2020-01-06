@@ -4,32 +4,79 @@ from atst.database import db
 from atst.domain.csp.cloud import ConnectionException, UnknownServerException
 from atst.domain.csp import MockCSP, AzureCSP
 
-class FSMStageStates(Enum):
+class StageStates(Enum):
     CREATED = "created"
     IN_PROGRESS = "in progress"
     FAILED = "failed"
 
-class AzureFSMStages(Enum):
+class AzureStages(Enum):
     TENANT = "tenant"
     BILLING_PROFILE = "billing profile"
     ADMIN_SUBSCRIPTION = "admin subscription"
 
-azure_states = {
-    'UNSTARTED' : "unstarted",
-    'STARTING' : "starting",
-    'STARTED' : "started",
-    'COMPLETED' : "completed",
-    'FAILED' : "failed",
-}
-for stage in AzureFSMStages:
-    for state in FSMStageStates:
-        azure_states[stage.name+"_"+state.name] = stage.value+" "+state.value
+def _build_csp_states(csp_stages):
+    states = {
+        'UNSTARTED' : "unstarted",
+        'STARTING' : "starting",
+        'STARTED' : "started",
+        'COMPLETED' : "completed",
+        'FAILED' : "failed",
+    }
+    for csp_stage in csp_stages:
+        for state in StageStates:
+            states[csp_stage.name+"_"+state.name] = csp_stage.value+" "+state.value
+    return states
 
-FSMStates = Enum('FSMStates', azure_states)
+FSMStates = Enum('FSMStates', _build_csp_states(AzureStages))
 
-class AzureFSMMixin():
 
-    states_base = [
+def _build_transitions(csp_stages):
+    transitions = []
+    states = []
+    compose_state = lambda csp_stage, state: getattr(FSMStates, "_".join([csp_stage.name, state.name]))
+
+    for stage_i, csp_stage in enumerate(csp_stages):
+        for state in StageStates:
+            states.append(dict(name=compose_state(csp_stage, state), tags=[csp_stage.name, state.name]))
+            if state == StageStates.CREATED:
+                if stage_i > 0:
+                    src = compose_state(list(csp_stages)[stage_i-1] , StageStates.CREATED)
+                else:
+                    src = FSMStates.STARTED
+                transitions.append(
+                    dict(
+                        trigger='create_'+csp_stage.name.lower(),
+                        source=src,
+                        dest=compose_state(csp_stage, StageStates.IN_PROGRESS),
+                        prepare='prepare_' + csp_stage.name.lower(),
+                        before='before_' + csp_stage.name.lower(),
+                        after='after_in_progress_callback',
+                        #after='after_' + csp_stage.name.lower(),
+                    )
+                )
+            if state == StageStates.IN_PROGRESS:
+                transitions.append(
+                    dict(
+                        trigger='finish_'+csp_stage.name.lower(),
+                        source=compose_state(csp_stage, state),
+                        dest=compose_state(csp_stage, StageStates.CREATED),
+                        conditions=['is_csp_data_valid'],
+                        #conditions=['is_%s_created' % csp_stage.name.lower()],
+                    )
+                )
+            if state == StageStates.FAILED:
+                transitions.append(
+                    dict(
+                        trigger='fail_'+csp_stage.name.lower(),
+                        source=compose_state(csp_stage, StageStates.IN_PROGRESS),
+                        dest=compose_state(csp_stage, StageStates.FAILED),
+                    )
+                )
+    return states, transitions
+
+class BaseFSMMixin():
+
+    system_states = [
         {'name': FSMStates.UNSTARTED.name, 'tags': ['system']},
         {'name': FSMStates.STARTING.name, 'tags': ['system']},
         {'name': FSMStates.STARTED.name, 'tags': ['system']},
@@ -37,8 +84,8 @@ class AzureFSMMixin():
         {'name': FSMStates.COMPLETED.name, 'tags': ['system']},
     ]
 
-    transitions_base = [
-        {'trigger': 'init', 
+    system_transitions = [
+        {'trigger': 'init',
             'source': FSMStates.UNSTARTED, 
             'dest': FSMStates.STARTING
         },
@@ -46,52 +93,6 @@ class AzureFSMMixin():
         {'trigger': 'reset', 'source': '*', 'dest': FSMStates.UNSTARTED},
         {'trigger': 'fail', 'source': '*', 'dest': FSMStates.FAILED,}
     ]
-
-
-    # getattr(AzureFSMStages, FSMStates.TENANT_IN_PROGRESS.name.split('_')[0]).value
-
-
-    def _azure_transitions(self):
-        transitions = []
-        states = []
-        compose_state = lambda stage, state: getattr(FSMStates, "_".join([stage.name, state.name]))
-
-        for stage_i, stage in enumerate(AzureFSMStages):
-            for state in FSMStageStates:
-                states.append(dict(name=compose_state(stage, state), tags=[stage.name, state.name]))
-                if state == FSMStageStates.CREATED:
-                    if stage_i > 0:
-                        src = compose_state(list(AzureFSMStages)[stage_i-1] , FSMStageStates.CREATED)
-                    else:
-                        src = FSMStates.STARTED
-                    transitions.append(
-                        dict(
-                            trigger='create_'+stage.name.lower(),
-                            source=src,
-                            dest=compose_state(stage, FSMStageStates.IN_PROGRESS),
-                            prepare='prepare_' + stage.name.lower(),
-                            before='before_' + stage.name.lower(),
-                            after='after_' + stage.name.lower(),
-                        )
-                    )
-                if state == FSMStageStates.IN_PROGRESS:
-                    transitions.append(
-                        dict(
-                            trigger='finish_'+stage.name.lower(),
-                            source=compose_state(stage, state),
-                            dest=compose_state(stage, FSMStageStates.CREATED),
-                            conditions=['is_%s_created' % stage.name.lower()],
-                        )
-                    )
-                if state == FSMStageStates.FAILED:
-                    transitions.append(
-                        dict(
-                            trigger='fail_'+stage.name.lower(),
-                            source=compose_state(stage, FSMStageStates.IN_PROGRESS),
-                            dest=compose_state(stage, FSMStageStates.FAILED),
-                        )
-                    )
-        return states, transitions
 
     def prepare_init(self, event): pass
     def before_init(self, event): pass
@@ -106,12 +107,16 @@ class AzureFSMMixin():
     def after_reset(self, event): pass
 
 
+#decorator to build context before making the api call
+def with_csp_call_contenxt():
+    pass
 
-class TenantMixin():
+class AzureTenantMixin():
 
     def prepare_tenant(self, event): pass
     def before_tenant(self, event): pass
 
+    #@with_csp_call_contenxt
     def after_tenant(self, event):
         # enter in_progress state and make api call
         # after state transitions to TENANT_IN_PROGRESS.
@@ -163,7 +168,7 @@ class TenantMixin():
             "user_object_id" in self.portfolio.csp_data['tenant_data'],
         ])
 
-class BillingProfileMixin:
+class AzureBillingProfileMixin:
 
     def prepare_billing_profile(self, event): pass
     def before_billing_profile(self, event): pass
