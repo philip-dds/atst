@@ -33,13 +33,11 @@ class PortfolioStateMachines(object):
 class Portfolios(object):
 
     @classmethod
-    def create_state_machine(cls, portfolio):
+    def get_or_create_state_machine(cls, portfolio):
         """
-        create Portfolio State Machine for a Portfolio
+        get or create Portfolio State Machine for a Portfolio
         """
-        if not portfolio.state_machine:
-            fsm = PortfolioStateMachines.create(portfolio)
-            return fsm
+        return portfolio.state_machine or PortfolioStateMachines.create(portfolio)
 
     @classmethod
     def create(cls, user, portfolio_attrs):

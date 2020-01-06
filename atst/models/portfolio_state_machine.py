@@ -10,6 +10,8 @@ from transitions.extensions.states import add_state_features, Tags
 
 from flask import current_app as app
 
+from atst.domain.csp.cloud import ConnectionException, UnknownServerException
+from atst.domain.csp import MockCSP, AzureCSP
 from atst.database import db
 from atst.queue import celery
 from atst.models.types import Id
@@ -142,7 +144,7 @@ class PortfolioStateMachine(
         self.machine = StateMachineWithTags(
                 model = self,
                 send_event=True,
-                initial=self.state.name if self.state else FSMStates.UNSTARTED.name,
+                initial=self.current_state if self.state else FSMStates.UNSTARTED,
                 auto_transitions=False,
                 after_state_change='after_state_change',
         )
@@ -150,10 +152,40 @@ class PortfolioStateMachine(
         self.machine.add_states(self.system_states+states)
         self.machine.add_transitions(self.system_transitions+transitions)
 
+    @property
+    def current_state(self):
+        if isinstance(self.state, str):
+            return getattr(FSMStates, self.state)
+        return self.state
+
+    def trigger_next_transition(self):
+        state_obj = self.machine.get_state(self.state)
+
+        if state_obj.is_system:
+            if self.current_state in (FSMStates.UNSTARTED, FSMStates.STARTING):
+                # call the first trigger availabe for these two system states
+                trigger_name = self.machine.get_triggers(self.current_state.name)[0]
+                self.trigger(trigger_name)
+
+            elif self.current_state == FSMStates.STARTED:
+                # get the first trigger that starts with 'create_'
+                create_trigger = list(filter(lambda trigger: trigger.startswith('create_'),
+                    self.machine.get_triggers(FSMStates.STARTED.name)))[0]
+                self.trigger(create_trigger)
+
+        elif state_obj.is_IN_PROGRESS:
+            pass
+
+        #elif state_obj.is_TENANT:
+        #    pass
+        #elif state_obj.is_BILLING_PROFILE:
+        #    pass
+
+
     #@with_payload
     def after_in_progress_callback(self, event):
-        import ipdb;ipdb.set_trace()
-        stage = 'tenant'
+        stage = self.current_state.name.split('_IN_PROGRESS')[0].lower()
+
         if stage == 'tenant':
             payload = TenantCSPPayload(
                     creds={"username": "mock-cloud", "pass": "shh"},
@@ -179,64 +211,42 @@ class PortfolioStateMachine(
 
         for attempt in range(5):
             try:
-                #response = self.csp.create_tenant(**kwargs)
-                response = getattr(self.csp, 'create_'+stage)(payload.__dict__)
+                response = getattr(self.csp, 'create_'+stage)(payload)
             except (ConnectionException, UnknownServerException) as exc:
                 print('caught exception. retry', attempt)
                 continue
             else: break
         else:
             # failed all attempts
-            #self.machine.fail_tenant()
             getattr(self.machine, 'fail_'+stage)()
 
         if self.portfolio.csp_data is None:
             self.portfolio.csp_data = {}
-        self.portfolio.csp_data["tenant_data"] = response
+        self.portfolio.csp_data[stage+"_data"] = response
         db.session.add(self.portfolio)
         db.session.commit()
 
+        self.trigger('finish_'+stage)
+
     def is_csp_data_valid(self, event):
         # check portfolio csp details json field for fields
-
         if self.portfolio.csp_data is None or \
                 not isinstance(self.portfolio.csp_data, dict):
             return False
 
-        return all([
-            "tenant_data" in self.portfolio.csp_data,
-            "tenant_id" in self.portfolio.csp_data['tenant_data'],
-            "user_id" in self.portfolio.csp_data['tenant_data'],
-            "user_object_id" in self.portfolio.csp_data['tenant_data'],
-        ])
+        stage = self.current_state.name.split('_IN_PROGRESS')[0].lower()
+        if stage == 'tenant':
+            return all([
+                "tenant_data" in self.portfolio.csp_data,
+                "tenant_id" in self.portfolio.csp_data['tenant_data'],
+                "user_id" in self.portfolio.csp_data['tenant_data'],
+                "user_object_id" in self.portfolio.csp_data['tenant_data'],
+            ])
+        elif stage == 'billing_profile':
+            return all([])
 
+        print('failed condition', self.portfolio.csp_data)
 
-    def trigger_next_transition(self):
-        state_obj = self.machine.get_state(self.state)
-
-        #FSMStates.UNSTARTED: self.init,
-        #FSMStates.STARTING: self.start,
-        #FSMStates.STARTED: self
-
-        if state_obj.is_system:
-            if self.state in (FSMStates.UNSTARTED, FSMStates.STARTING):
-                # call the first trigger availabe for these two system states
-                self.trigger(sm.machine.get_triggers(self.state)[0])
-
-            elif self.state == FSMStates.STARTED:
-                # get the first trigger that starts with 'create_'
-                create_trigger = list(filter(lambda trigger: trigger.startswith('create_'),
-                    self.machine.get_triggers(FSMStates.STARTED.name)))[0]
-                self.trigger(create_trigger)
-
-        elif state_obj.is_IN_PROGRESS:
-            pass
-            #fsm.finish_create_tenant()
-
-        #elif state_obj.is_TENANT:
-        #    pass
-        #elif state_obj.is_BILLING_PROFILE:
-        #    pass
 
     @property
     def application_id(self):

@@ -324,19 +324,9 @@ class MockCloudProvider(CloudProviderInterface):
         return {"id": self._id(), "credentials": self._auth_credentials}
 
 
-    def create_tenant(
-        self,
-        creds,
-        user_id,
-        password,
-        domain_name,
-        first_name,
-        last_name,
-        country_code,
-        password_recovery_email_address,
-    ):
+    def create_tenant(self, payload):
 
-        self._authorize(creds)
+        self._authorize(payload.creds)
 
         self._delay(1, 5)
 
@@ -574,17 +564,8 @@ class AzureCloudProvider(CloudProviderInterface):
             "role_name": role_assignment_id,
         }
 
-    def create_tenant(
-        self,
-        creds,
-        user_id,
-        password,
-        domain_name,
-        first_name,
-        last_name,
-        country_code,
-        password_recovery_email_address,
-    ):
+
+    def create_tenant(self, payload):
         # auth as SP that is allowed to create tenant? (tenant creation sp creds)
         # create tenant with owner details (populated from portfolio point of contact, pw is generated)
 

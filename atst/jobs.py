@@ -142,12 +142,8 @@ def do_work(fn, task, csp, **kwargs):
 
 def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
     portfolio = Portfolios.get_for_update(portfolio_id)
-    if  portfolio.state_machine is None:
-        fsm = Portfolios.create_state_machine(portfolio)
-        db.session.add(fsm)
-        db.session.commit()
-
-    portfolio.state_machine.trigger_next_transition()
+    fsm = Portfolios.get_or_create_state_machine(portfolio)
+    fsm.trigger_next_transition()
 
 
 @celery.task(bind=True, base=RecordPortfolioFailure)

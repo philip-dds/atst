@@ -1,8 +1,6 @@
 from enum import Enum
 
 from atst.database import db
-from atst.domain.csp.cloud import ConnectionException, UnknownServerException
-from atst.domain.csp import MockCSP, AzureCSP
 
 class StageStates(Enum):
     CREATED = "created"
@@ -48,8 +46,8 @@ def _build_transitions(csp_stages):
                         trigger='create_'+csp_stage.name.lower(),
                         source=src,
                         dest=compose_state(csp_stage, StageStates.IN_PROGRESS),
-                        prepare='prepare_' + csp_stage.name.lower(),
-                        before='before_' + csp_stage.name.lower(),
+                        #prepare='prepare_' + csp_stage.name.lower(),
+                        #before='before_' + csp_stage.name.lower(),
                         after='after_in_progress_callback',
                         #after='after_' + csp_stage.name.lower(),
                     )
