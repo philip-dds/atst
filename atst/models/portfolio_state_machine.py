@@ -21,7 +21,7 @@ from atst.models.mixins.state_machines import (
 
 
 @dataclass
-class BaseCSPArgs:
+class BaseCSPPayload:
     #{"username": "mock-cloud", "pass": "shh"}
     creds: Dict
 
@@ -108,10 +108,7 @@ class StateMachineWithTags(Machine):
     pass
 
 class PortfolioStateMachine(
-    Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin,
-    mixins.BaseFSMMixin,
-    #mixins.AzureTenantMixin,
-    #mixins.AzureBillingProfileMixin,
+    Base, mixins.TimestampsMixin, mixins.AuditableMixin, mixins.DeletableMixin, mixins.FSMMixin,
 ):
     __tablename__ = "portfolio_state_machines"
 
@@ -155,8 +152,9 @@ class PortfolioStateMachine(
 
     #@with_payload
     def after_in_progress_callback(self, event):
+        import ipdb;ipdb.set_trace()
         stage = 'tenant'
-        if stage == 'tenant'
+        if stage == 'tenant':
             payload = TenantCSPPayload(
                     creds={"username": "mock-cloud", "pass": "shh"},
                     user_id='123',
@@ -167,7 +165,7 @@ class PortfolioStateMachine(
                     country_code='US',
                     password_recovery_email_address='password@email.com'
             )
-        elif stage == 'billing_profile'
+        elif stage == 'billing_profile':
             payload = BillingProfileCSPPayload(
                     creds={"username": "mock-cloud", "pass": "shh"},
             )
@@ -213,8 +211,7 @@ class PortfolioStateMachine(
         ])
 
 
-
-    def trigger_next_transition(self, csp):
+    def trigger_next_transition(self):
         state_obj = self.machine.get_state(self.state)
 
         #FSMStates.UNSTARTED: self.init,
@@ -222,31 +219,24 @@ class PortfolioStateMachine(
         #FSMStates.STARTED: self
 
         if state_obj.is_system:
-            if self.state == FSMStates.UNSTARTED:
-                self.init()
-
-            elif fsm.state == FSMStates.STARTING:
-                self.start()
+            if self.state in (FSMStates.UNSTARTED, FSMStates.STARTING):
+                # call the first trigger availabe for these two system states
+                self.trigger(sm.machine.get_triggers(self.state)[0])
 
             elif self.state == FSMStates.STARTED:
-                # iterate over stages and check the state tag
-                #for stage in [st.name for st in list(AzureStages)]:
-                #self.machine.get_triggers(sm.state)
-                #fsm.create_tenant(csp=csp.cloud)
-                #getattr(self, 'create_tenant')()
-                #event = self.machine.events['create_tenant']
-                #event.name
-                #event.transitions
+                # get the first trigger that starts with 'create_'
+                create_trigger = list(filter(lambda trigger: trigger.startswith('create_'),
+                    self.machine.get_triggers(FSMStates.STARTED.name)))[0]
+                self.trigger(create_trigger)
 
-                pass
         elif state_obj.is_IN_PROGRESS:
             pass
             #fsm.finish_create_tenant()
 
-        elif state_obj.is_TENANT:
-            pass
-        elif state_obj.is_BILLING_PROFILE:
-            pass
+        #elif state_obj.is_TENANT:
+        #    pass
+        #elif state_obj.is_BILLING_PROFILE:
+        #    pass
 
     @property
     def application_id(self):

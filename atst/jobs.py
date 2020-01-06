@@ -147,7 +147,7 @@ def do_provision_portfolio(csp: CloudProviderInterface, portfolio_id=None):
         db.session.add(fsm)
         db.session.commit()
 
-    portfolio.state_machine.trigger_next_transition(csp)
+    portfolio.state_machine.trigger_next_transition()
 
 
 @celery.task(bind=True, base=RecordPortfolioFailure)
