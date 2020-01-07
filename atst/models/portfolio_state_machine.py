@@ -1,10 +1,10 @@
-from dataclasses import dataclass
-from typing import Dict#, Any
+import importlib
 
 from sqlalchemy import Column, ForeignKey, Enum as SQLAEnum
 from sqlalchemy.orm import relationship, reconstructor
 from sqlalchemy.dialects.postgresql import UUID
 
+from pydantic import ValidationError as PydanticValidationError
 from transitions import Machine
 from transitions.extensions.states import add_state_features, Tags
 
@@ -22,96 +22,6 @@ from atst.models.mixins.state_machines import (
 )
 
 
-@dataclass
-class BaseCSPPayload:
-    #{"username": "mock-cloud", "pass": "shh"}
-    creds: Dict
-
-
-@dataclass
-class TenantCSPPayload(BaseCSPPayload):
-    user_id: str
-    password: str
-    domain_name: str
-    first_name: str
-    last_name: str
-    country_code: str
-    password_recovery_email_address: str
-
-
-@dataclass
-class TenantCSPResult():
-    user_id: str
-    tenant_id: str
-    user_object_id: str
-
-
-@dataclass
-class BillingProfileAddress():
-    address: Dict
-    """
-    "address": {
-        "firstName": "string",
-        "lastName": "string",
-        "companyName": "string",
-        "addressLine1": "string",
-        "addressLine2": "string",
-        "addressLine3": "string",
-        "city": "string",
-        "region": "string",
-        "country": "string",
-        "postalCode": "string"
-    },
-    """
-@dataclass
-class BillingProfileCLINBudget():
-    clinBudget: Dict
-    """
-        "clinBudget": {
-            "amount": 0,
-            "startDate": "2019-12-18T16:47:40.909Z",
-            "endDate": "2019-12-18T16:47:40.909Z",
-            "externalReferenceId": "string"
-        }
-    """
-
-@dataclass
-class BillingProfileCSPPayload(BaseCSPPayload, BillingProfileAddress, BillingProfileCLINBudget):
-    displayName: str
-    poNumber: str
-    invoiceEmailOptIn: str
-
-    """
-    {
-        "displayName": "string",
-        "poNumber": "string",
-        "address": {
-            "firstName": "string",
-            "lastName": "string",
-            "companyName": "string",
-            "addressLine1": "string",
-            "addressLine2": "string",
-            "addressLine3": "string",
-            "city": "string",
-            "region": "string",
-            "country": "string",
-            "postalCode": "string"
-        },
-        "invoiceEmailOptIn": true,
-        Note: These last 2 are also the body for adding/updating new TOs/clins
-        "enabledAzurePlans": [
-            {
-            "skuId": "string"
-            }
-        ],
-        "clinBudget": {
-            "amount": 0,
-            "startDate": "2019-12-18T16:47:40.909Z",
-            "endDate": "2019-12-18T16:47:40.909Z",
-            "externalReferenceId": "string"
-        }
-    }
-    """
 
 @add_state_features(Tags)
 class StateMachineWithTags(Machine):
@@ -193,9 +103,8 @@ class PortfolioStateMachine(
     #@with_payload
     def after_in_progress_callback(self, event):
         stage = self.current_state.name.split('_IN_PROGRESS')[0].lower()
-
         if stage == 'tenant':
-            payload = TenantCSPPayload(
+            payload = dict(
                     creds={"username": "mock-cloud", "pass": "shh"},
                     user_id='123',
                     password='123',
@@ -206,12 +115,20 @@ class PortfolioStateMachine(
                     password_recovery_email_address='password@email.com'
             )
         elif stage == 'billing_profile':
-            payload = BillingProfileCSPPayload(
-                    creds={"username": "mock-cloud", "pass": "shh"},
+            payload = dict(
+                creds={"username": "mock-cloud", "pass": "shh"},
             )
 
-        csp = event.kwargs.get('csp')
+        payload_data_cls = self.stage_csp_class(stage, "payload")
+        if not payload_data_cls:
+            self.fail_stage(stage)
+        try:
+            payload_data = payload_data_cls(**payload)
+        except PydanticValidationError as exc:
+            print(exc.json())
+            self.fail_stage(stage)
 
+        csp = event.kwargs.get('csp')
         if csp is not None:
             self.csp = AzureCSP(app).cloud
         else:
@@ -219,14 +136,14 @@ class PortfolioStateMachine(
 
         for attempt in range(5):
             try:
-                response = getattr(self.csp, 'create_'+stage)(payload)
+                response = getattr(self.csp, 'create_'+stage)(payload_data)
             except (ConnectionException, UnknownServerException) as exc:
                 print('caught exception. retry', attempt)
                 continue
             else: break
         else:
             # failed all attempts
-            getattr(self.machine, 'fail_'+stage)()
+            self.fail_stage(stage)
 
         if self.portfolio.csp_data is None:
             self.portfolio.csp_data = {}
@@ -234,29 +151,30 @@ class PortfolioStateMachine(
         db.session.add(self.portfolio)
         db.session.commit()
 
-        self.trigger('finish_'+stage)
+        self.finish_stage(stage)
 
     def is_csp_data_valid(self, event):
         # check portfolio csp details json field for fields
+
         if self.portfolio.csp_data is None or \
                 not isinstance(self.portfolio.csp_data, dict):
             return False
 
         stage = self.current_state.name.split('_IN_PROGRESS')[0].lower()
-        if stage == 'tenant':
+        stage_data = self.portfolio.csp_data.get(stage+"_data")
+        cls = self.stage_csp_class(stage, "result")
+        if not cls:
+            return False
 
-            #TenantCSPResult.__dataclass_fields__.keys()
+        try:
+            cls(**stage_data)
+        except PydanticValidationError as exc:
+            print(exc.json())
+            return False
 
-            return all([
-                "tenant_data" in self.portfolio.csp_data,
-                "tenant_id" in self.portfolio.csp_data['tenant_data'],
-                "user_id" in self.portfolio.csp_data['tenant_data'],
-                "user_object_id" in self.portfolio.csp_data['tenant_data'],
-            ])
-        elif stage == 'billing_profile':
-            return all([])
+        return True
 
-        print('failed condition', self.portfolio.csp_data)
+        #print('failed condition', self.portfolio.csp_data)
 
 
     @property

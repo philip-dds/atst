@@ -1,6 +1,8 @@
-from typing import Dict
 import re
+from typing import Dict
 from uuid import uuid4
+
+from pydantic import BaseModel
 
 from atst.models.user import User
 from atst.models.environment import Environment
@@ -138,6 +140,92 @@ class BaselineProvisionException(GeneralCSPException):
         return "Could not complete baseline provisioning for environment ({}): {}".format(
             self.env_identifier, self.reason
         )
+
+
+class BaseCSPPayload(BaseModel):
+    #{"username": "mock-cloud", "pass": "shh"}
+    creds: Dict
+
+
+class TenantCSPPayload(BaseCSPPayload):
+    user_id: str
+    password: str
+    domain_name: str
+    first_name: str
+    last_name: str
+    country_code: str
+    password_recovery_email_address: str
+
+
+class TenantCSPResult(BaseModel):
+    user_id: str
+    tenant_id: str
+    user_object_id: str
+
+
+class BillingProfileAddress(BaseModel):
+    address: Dict
+    """
+    "address": {
+        "firstName": "string",
+        "lastName": "string",
+        "companyName": "string",
+        "addressLine1": "string",
+        "addressLine2": "string",
+        "addressLine3": "string",
+        "city": "string",
+        "region": "string",
+        "country": "string",
+        "postalCode": "string"
+    },
+    """
+class BillingProfileCLINBudget(BaseModel):
+    clinBudget: Dict
+    """
+        "clinBudget": {
+            "amount": 0,
+            "startDate": "2019-12-18T16:47:40.909Z",
+            "endDate": "2019-12-18T16:47:40.909Z",
+            "externalReferenceId": "string"
+        }
+    """
+
+class BillingProfileCSPPayload(BaseCSPPayload, BillingProfileAddress, BillingProfileCLINBudget):
+    displayName: str
+    poNumber: str
+    invoiceEmailOptIn: str
+
+    """
+    {
+        "displayName": "string",
+        "poNumber": "string",
+        "address": {
+            "firstName": "string",
+            "lastName": "string",
+            "companyName": "string",
+            "addressLine1": "string",
+            "addressLine2": "string",
+            "addressLine3": "string",
+            "city": "string",
+            "region": "string",
+            "country": "string",
+            "postalCode": "string"
+        },
+        "invoiceEmailOptIn": true,
+        Note: These last 2 are also the body for adding/updating new TOs/clins
+        "enabledAzurePlans": [
+            {
+            "skuId": "string"
+            }
+        ],
+        "clinBudget": {
+            "amount": 0,
+            "startDate": "2019-12-18T16:47:40.909Z",
+            "endDate": "2019-12-18T16:47:40.909Z",
+            "externalReferenceId": "string"
+        }
+    }
+    """
 
 
 class CloudProviderInterface:
@@ -325,6 +413,9 @@ class MockCloudProvider(CloudProviderInterface):
 
 
     def create_tenant(self, payload):
+        """
+        payload is an instance of TenantCSPPayload data class
+        """
 
         self._authorize(payload.creds)
 
