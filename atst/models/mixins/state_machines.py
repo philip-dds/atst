@@ -46,10 +46,7 @@ def _build_transitions(csp_stages):
                         trigger='create_'+csp_stage.name.lower(),
                         source=src,
                         dest=compose_state(csp_stage, StageStates.IN_PROGRESS),
-                        #prepare='prepare_' + csp_stage.name.lower(),
-                        #before='before_' + csp_stage.name.lower(),
                         after='after_in_progress_callback',
-                        #after='after_' + csp_stage.name.lower(),
                     )
                 )
             if state == StageStates.IN_PROGRESS:
@@ -59,7 +56,6 @@ def _build_transitions(csp_stages):
                         source=compose_state(csp_stage, state),
                         dest=compose_state(csp_stage, StageStates.CREATED),
                         conditions=['is_csp_data_valid'],
-                        #conditions=['is_%s_created' % csp_stage.name.lower()],
                     )
                 )
             if state == StageStates.FAILED:

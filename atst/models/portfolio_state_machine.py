@@ -27,6 +27,7 @@ class BaseCSPPayload:
     #{"username": "mock-cloud", "pass": "shh"}
     creds: Dict
 
+
 @dataclass
 class TenantCSPPayload(BaseCSPPayload):
     user_id: str
@@ -36,6 +37,13 @@ class TenantCSPPayload(BaseCSPPayload):
     last_name: str
     country_code: str
     password_recovery_email_address: str
+
+
+@dataclass
+class TenantCSPResult():
+    user_id: str
+    tenant_id: str
+    user_object_id: str
 
 
 @dataclass
@@ -236,6 +244,9 @@ class PortfolioStateMachine(
 
         stage = self.current_state.name.split('_IN_PROGRESS')[0].lower()
         if stage == 'tenant':
+
+            #TenantCSPResult.__dataclass_fields__.keys()
+
             return all([
                 "tenant_data" in self.portfolio.csp_data,
                 "tenant_id" in self.portfolio.csp_data['tenant_data'],
