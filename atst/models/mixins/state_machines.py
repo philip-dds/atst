@@ -98,24 +98,13 @@ class FSMMixin():
     def before_reset(self, event): pass
     def after_reset(self, event): pass
 
-    def _stage_to_classname(self, stage):
-        return "".join(map(lambda word: word.capitalize(), stage.replace('_', ' ').split(" ")))
-
-    def stage_csp_class(self, stage, class_type):
-        """
-        given a stage name and class_type return the class
-        class_type is either 'payload' or 'result'
-
-        """
-        cls_name = "".join([self._stage_to_classname(stage), "CSP", class_type.capitalize()])
-        try:
-            return getattr(importlib.import_module("atst.domain.csp.cloud"), cls_name)
-        except AttributeError:
-            print("could not import CSP Result class <%s>" % cls_name)
-
     def fail_stage(self, stage):
-        getattr(self.machine, 'fail_'+stage)()
+        fail_trigger = 'fail'+stage
+        if fail_trigger in self.machine.get_triggers(self.current_state.name):
+            self.trigger(fail_trigger)
 
     def finish_stage(self, stage):
-        self.trigger('finish_'+stage)
+        finish_trigger = 'finish_'+stage
+        if finish_trigger in self.machine.get_triggers(self.current_state.name):
+            self.trigger(finish_trigger)
 

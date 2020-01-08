@@ -11,7 +11,7 @@ from transitions.extensions.states import add_state_features, Tags
 from flask import current_app as app
 
 from atst.domain.csp.cloud import ConnectionException, UnknownServerException
-from atst.domain.csp import MockCSP, AzureCSP
+from atst.domain.csp import MockCSP, AzureCSP, get_stage_csp_class
 from atst.database import db
 from atst.queue import celery
 from atst.models.types import Id
@@ -119,7 +119,7 @@ class PortfolioStateMachine(
                 creds={"username": "mock-cloud", "pass": "shh"},
             )
 
-        payload_data_cls = self.stage_csp_class(stage, "payload")
+        payload_data_cls = get_stage_csp_class(stage, "payload")
         if not payload_data_cls:
             self.fail_stage(stage)
         try:
@@ -162,7 +162,7 @@ class PortfolioStateMachine(
 
         stage = self.current_state.name.split('_IN_PROGRESS')[0].lower()
         stage_data = self.portfolio.csp_data.get(stage+"_data")
-        cls = self.stage_csp_class(stage, "result")
+        cls = get_stage_csp_class(stage, "result")
         if not cls:
             return False
 
